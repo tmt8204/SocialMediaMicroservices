@@ -26,56 +26,6 @@ public class UserService {
         return toUserResponse(user);
     }
 
-    public UserResponse createProfile(String userId, String username, String email) {
-        String normalizedUserId = userId == null ? "" : userId.trim();
-        String normalizedUsername = username == null ? "" : username.trim();
-        String normalizedEmail = email == null ? "" : email.trim();
-
-        if (normalizedUserId.isBlank()) {
-            throw new IllegalArgumentException("User id is required");
-        }
-
-        if (normalizedUsername.isBlank()) {
-            throw new IllegalArgumentException("Username header is required");
-        }
-
-        if (normalizedEmail.isBlank()) {
-            throw new IllegalArgumentException("Email header is required");
-        }
-
-        User existingUser = userRepository.findByUserId(normalizedUserId).orElse(null);
-        if (existingUser != null) {
-            return toUserResponse(existingUser);
-        }
-
-        if (userRepository.existsByUsernameIgnoreCase(normalizedUsername)) {
-            throw new IllegalStateException("Username already exists");
-        }
-
-        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw new IllegalStateException("Email already exists");
-        }
-
-        User user = new User();
-        user.setUserId(normalizedUserId);
-        user.setUsername(normalizedUsername);
-        user.setEmail(normalizedEmail);
-
-        user.setFullName(null);
-        user.setAvatarUrl(null);
-        user.setBio(null);
-        user.setCoverUrl(null);
-        user.setBirthDay(null);
-        user.setLocation(null);
-        user.setRelationship(null);
-        user.setPhone(null);
-
-        user.setUpdateAt(Instant.now());
-
-        userRepository.save(user);
-        return toUserResponse(user);
-    }
-
     public UserResponse getProfileByUsername(String username) {
         String normalizedUsername = username == null ? "" : username.trim();
 

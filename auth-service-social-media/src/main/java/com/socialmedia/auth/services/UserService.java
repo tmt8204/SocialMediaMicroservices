@@ -58,9 +58,6 @@ public class UserService {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    @Value("${app.user-service.create-profile-url}")
-    private String createProfileUrl;
-
     public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder,
             JwtService jwtService, UserTokenRepository userTokenRepository, EmailService emailService,
             KafkaEventProducer kafkaEventProducer) {
