@@ -2,23 +2,14 @@ package com.socialmedia.auth.services;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-
-import java.net.URI;
 import java.util.UUID;
-
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.RequestEntity;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.client.RestTemplate;
-
 import com.socialmedia.auth.dto.AuthResponse;
 import com.socialmedia.auth.dto.ChangePasswordRequest;
+import com.socialmedia.auth.dto.CreateProfileEvent;
 import com.socialmedia.auth.dto.ForgotPasswordRequest;
 import com.socialmedia.auth.dto.LoginRequest;
 import com.socialmedia.auth.dto.RegisterRequest;
@@ -59,7 +50,7 @@ public class UserService {
     private final JwtService jwtService;
     private final UserTokenRepository userTokenRepository;
     private final EmailService emailService;
-    private final RestTemplate restTemplate;
+    private final KafkaEventProducer kafkaEventProducer;
 
     @Value("${app.reset-password-token-expiration-ms}")
     private long resetPasswordTokenExpirationMs;
@@ -71,14 +62,15 @@ public class UserService {
     private String createProfileUrl;
 
     public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder,
-            JwtService jwtService, UserTokenRepository userTokenRepository, EmailService emailService) {
+            JwtService jwtService, UserTokenRepository userTokenRepository, EmailService emailService,
+            KafkaEventProducer kafkaEventProducer) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.userTokenRepository = userTokenRepository;
         this.emailService = emailService;
-        this.restTemplate = new RestTemplate();
+        this.kafkaEventProducer = kafkaEventProducer;
     }
 
     // -------------------- User Registration ------------------- //
@@ -125,20 +117,32 @@ public class UserService {
         // Save user to database
         userRepository.save(user);
 
-        // Sync profile in user-service so auth user and profile stay consistent.
+        // Publish CreateProfileEvent to Kafka topic for user-service to consume
         try {
-            createProfileInUserService(user);
-        } catch (RestClientResponseException ex) {
-            userRepository.deleteById(user.getId());
-            String details = ex.getResponseBodyAsString();
-            throw new BadRequestException("Failed to create profile in user-service. Status: "
-                + ex.getStatusCode() + ". Response: " + details);
-        } catch (RestClientException ex) {
-            userRepository.deleteById(user.getId());
-            throw new BadRequestException("Failed to create profile in user-service. Registration was rolled back.");
+            publishUserCreatedEvent(user);
+        } catch (Exception ex) {
+            // Log error but don't rollback registration
+            // User service can handle this asynchronously or via retry
+            System.err.println("Failed to publish CreateProfileEvent for user: " + user.getUsername() + ". Error: " + ex.getMessage());
         }
 
         return issueTokens(user);
+    }
+
+    /**
+     * Publish user created event to Kafka topic
+     * Notifies user-service to create user profile
+     */
+    private void publishUserCreatedEvent(User user) {
+        CreateProfileEvent event = new CreateProfileEvent(
+            user.getId(),
+            user.getUsername(),
+            user.getEmail(),
+            user.getFullName(),
+            System.currentTimeMillis(),
+            "USER_CREATED"
+        );
+        kafkaEventProducer.publishCreateProfileEvent(event);
     }
 
     // -------------------- User Login ------------------- //
@@ -291,23 +295,6 @@ public class UserService {
         userToken.setExpiresAt(expiresAt);
         userToken.setRevoked(false);
         userTokenRepository.save(userToken);
-    }
-
-    private void createProfileInUserService(User user) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-User-Id", user.getId());
-        headers.set("X-User-Name", user.getUsername());
-        headers.set("X-Email", user.getEmail());
-
-        RequestEntity<Void> request = RequestEntity
-            .post(URI.create(createProfileUrl))
-            .headers(headers)
-            .build();
-
-        ResponseEntity<Void> response = restTemplate.exchange(request, Void.class);
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new BadRequestException("User-service returned non-success status: " + response.getStatusCode());
-        }
     }
 
     // -------------------- Forgot Password ------------------- //
