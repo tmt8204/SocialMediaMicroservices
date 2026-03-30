@@ -1,0 +1,52 @@
+package com.socialmedia.social_media_social_service.helpers;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
+import com.socialmedia.social_media_social_service.dto.PostResponse;
+import com.socialmedia.social_media_social_service.entities.PostEntity;
+import com.socialmedia.social_media_social_service.entities.PostMedia;
+
+@Component
+public class PostHelper {
+
+    /**
+     * Convert PostEntity to PostResponse DTO
+     * 
+     * @param post The PostEntity to convert
+     * @return PostResponse with all fields populated
+     */
+    public PostResponse convertToPostResponse(PostEntity post) {
+        PostResponse response = new PostResponse();
+        response.setId(post.getId());
+        response.setUserId(post.getUserId());
+        response.setContent(post.getContent());
+        response.setVisibility(post.getVisibility());
+        response.setCreatedAt(post.getCreatedAt());
+        response.setUpdatedAt(post.getUpdatedAt());
+
+        List<String> mediaUrls = new ArrayList<>();
+        for (PostMedia item : post.getMedia()) {
+            mediaUrls.add(item.getMediaUrl());
+        }
+        response.setMediaUrls(mediaUrls);
+
+        return response;
+    }
+
+    /**
+     * Resolve visibility value - defaults to PUBLIC if null or blank
+     * 
+     * @param visibility The visibility value to resolve
+     * @return Resolved visibility (PUBLIC, FRIEND, or other predefined values)
+     */
+    public String resolveVisibility(String visibility) {
+        if (visibility == null || visibility.isBlank()) {
+            return "PUBLIC";
+        }
+        return visibility;
+    }
+
+}
