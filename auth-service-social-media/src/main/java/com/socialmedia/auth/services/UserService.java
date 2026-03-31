@@ -171,6 +171,9 @@ public class UserService {
         user.setLastLoginAt(now);
         userRepository.save(user);
 
+        // Re-login invalidates all previously issued tokens for this user.
+        userTokenRepository.deleteByUserId(user.getId());
+
         return issueTokens(user);
     }
 

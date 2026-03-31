@@ -53,9 +53,9 @@ public class PostController {
         return ResponseEntity.ok(feedPosts);
     }
     
-    @GetMapping("/user/{userId}/posts")
+    @GetMapping("/user/posts")
     public ResponseEntity<Page<PostResponse>> getOwnerPost(
-            @PathVariable String userId,
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);

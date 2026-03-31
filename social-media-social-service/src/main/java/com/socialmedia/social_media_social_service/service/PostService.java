@@ -31,7 +31,7 @@ public class PostService {
     @Autowired
     private final PostHelper postHelper;
 
-    //----------------POST OPERATIONS----------------
+    //---------------- POST OPERATIONS ----------------
     public PostResponse createPost(String userId, PostCreateRequest request) {
         PostEntity post = new PostEntity();
         post.setUserId(userId);

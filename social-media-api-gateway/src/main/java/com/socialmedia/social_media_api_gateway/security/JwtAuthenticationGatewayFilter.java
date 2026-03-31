@@ -80,8 +80,6 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
                             .mutate()
                             .headers(headers -> {
                                 headers.set("X-User-Id", userId);
-                                headers.set("X-User-Name", userName);
-                                headers.set("X-Email", email);
                                 headers.set("X-Role", role);
                             })
                             .build();

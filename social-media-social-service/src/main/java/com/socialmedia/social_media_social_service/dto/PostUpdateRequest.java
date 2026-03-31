@@ -11,8 +11,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class PostCreateRequest {
-
+public class PostUpdateRequest {
     @NotBlank(message = "Content is required")
     private String content;
 
