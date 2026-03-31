@@ -72,25 +72,8 @@ public class UserService {
 
     // -------------------- User Registration ------------------- //
     public AuthResponse registerUser(RegisterRequest registerRequest) {
+
         // Validate input
-        if (registerRequest.getUsername() == null || registerRequest.getUsername().isBlank()) {
-            throw new BadRequestException("Username is required");
-        }
-        if (registerRequest.getUsername().length() < 6) {
-            throw new BadRequestException("Username must have at least 6 characters");
-        }
-        if (registerRequest.getEmail() == null || registerRequest.getEmail().isBlank()) {
-            throw new BadRequestException("Email is required");
-        }
-        if (registerRequest.getPassword() == null || registerRequest.getPassword().isBlank()) {
-            throw new BadRequestException("Password is required");
-        }
-
-        String strongPasswordRegex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$";
-        if (!registerRequest.getPassword().matches(strongPasswordRegex)) {
-            throw new BadRequestException("Password must contain at least 8 characters including uppercase, lowercase, digit and special character (@$!%*?&)");
-        }
-
         if (userRepository.existsByUsername(registerRequest.getUsername())) {
             throw new ConflictException("Username already exists");
         }
@@ -148,10 +131,6 @@ public class UserService {
         String username = loginRequest.getUsername();
         String password = loginRequest.getPassword();
         Instant now = Instant.now();
-
-        if (username == null || username.isBlank() || password == null || password.isBlank()) {
-            throw new BadRequestException("Username and password must not be empty");
-        }
 
         User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new UnauthorizedException("Invalid username or password"));
@@ -243,7 +222,7 @@ public class UserService {
         return "Password changed successfully";
     }
 
-    // -------------------- Helper JWT ------------------- //
+    // -------------------- JWT ------------------- //
     public AuthResponse refreshToken(String refreshToken) {
         // Validate input
         if (refreshToken == null || refreshToken.isBlank()) {

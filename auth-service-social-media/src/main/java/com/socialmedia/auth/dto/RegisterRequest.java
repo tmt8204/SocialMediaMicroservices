@@ -28,6 +28,7 @@ public class RegisterRequest {
     )
     private String password;
 
+    @NotBlank(message = "Full name is required")
     private String fullName;
 
 }

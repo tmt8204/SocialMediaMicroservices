@@ -18,6 +18,7 @@ public class UpdateProfileRequest {
     @NotBlank(message = "Email is required")
     private String email;
 
+    @NotBlank(message = "Full name is required")
     private String fullName;
 
     private String avatarUrl;

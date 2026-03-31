@@ -38,22 +38,40 @@ public class KafkaEventConsumer {
                     event.getUserId(), event.getUsername(), event.getEmail());
         
         try {
-            // Check if user already exists
-            if (userRepository.findByUserId(event.getUserId()).isPresent()) {
-                logger.warn("User profile already exists for userId: {}", event.getUserId());
+            String normalizedUserId = event.getUserId() == null ? "" : event.getUserId().trim();
+            String normalizedUsername = event.getUsername() == null ? "" : event.getUsername().trim();
+            String normalizedEmail = event.getEmail() == null ? "" : event.getEmail().trim();
+
+            if (normalizedUserId.isBlank()) {
+                throw new IllegalArgumentException("User id is required");
+            }
+
+            if (normalizedUsername.isBlank()) {
+                throw new IllegalArgumentException("Username header is required");
+            }
+
+            if (normalizedEmail.isBlank()) {
+                throw new IllegalArgumentException("Email header is required");
+            }
+
+            User existingUser = userRepository.findByUserId(normalizedUserId).orElse(null);
+            if (existingUser != null) {
                 return;
             }
 
-            if (userRepository.findByUsername(event.getUsername()).isPresent()) {
-                logger.warn("User profile already exists for username: {}", event.getUsername());
-                return;
+            if (userRepository.existsByUsernameIgnoreCase(normalizedUsername)) {
+                throw new IllegalStateException("Username already exists");
+            }
+
+            if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+                throw new IllegalStateException("Email already exists");
             }
             
             // Create new user profile
             User user = new User();
-            user.setUserId(event.getUserId());
-            user.setUsername(event.getUsername());
-            user.setEmail(event.getEmail());
+            user.setUserId(normalizedUserId);
+            user.setUsername(normalizedUsername);
+            user.setEmail(normalizedEmail);
             user.setFullName(event.getFullName());
             user.setUpdateAt(Instant.now());
             
