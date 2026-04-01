@@ -1,6 +1,5 @@
 package com.socialmedia.social_media_social_service.dto;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.validation.constraints.NotBlank;
@@ -18,5 +17,5 @@ public class PostUpdateRequest {
     @NotBlank(message = "Visibility is required")
     private String visibility; 
 
-    private List<String> mediaUrls = new ArrayList<>();
+    private List<String> mediaUrls;
 }

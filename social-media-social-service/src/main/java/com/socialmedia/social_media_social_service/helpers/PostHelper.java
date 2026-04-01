@@ -2,6 +2,7 @@ package com.socialmedia.social_media_social_service.helpers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Component;
 
@@ -46,7 +47,13 @@ public class PostHelper {
         if (visibility == null || visibility.isBlank()) {
             return "PUBLIC";
         }
-        return visibility;
+
+        String normalized = visibility.trim().toUpperCase(Locale.ROOT);
+        if (!"PUBLIC".equals(normalized) && !"FRIEND".equals(normalized) && !"PRIVATE".equals(normalized)) {
+            throw new IllegalArgumentException("Invalid visibility. Allowed values: PUBLIC, FRIEND, PRIVATE");
+        }
+
+        return normalized;
     }
 
 }
