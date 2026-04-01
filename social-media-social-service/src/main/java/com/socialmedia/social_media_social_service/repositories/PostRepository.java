@@ -14,10 +14,10 @@ import com.socialmedia.social_media_social_service.entities.PostEntity;
 public interface PostRepository extends JpaRepository<PostEntity, Long> {
 
     Optional<PostEntity> findByIdAndUserId(Long id, String userId);
-    
+
     @Query("SELECT p FROM PostEntity p WHERE p.id = :id AND p.userId = :userId AND p.isDeleted = false")
     Optional<PostEntity> findByIdAndUserIdAndIsDeletedFalse(@Param("id") Long id, @Param("userId") String userId);
-    
+
     @Query("""
     SELECT p FROM PostEntity p
     WHERE p.isDeleted = false
@@ -29,9 +29,18 @@ public interface PostRepository extends JpaRepository<PostEntity, Long> {
     ORDER BY p.createdAt DESC
     """)
     Page<PostEntity> findFeedPosts(@Param("userId") String userId, @Param("friendIds") List<String> friendIds, Pageable pageable);
-    
+
+    @Query("""
+    SELECT p FROM PostEntity p
+    WHERE p.isDeleted = false
+    AND p.userId != :userId
+    AND p.visibility = 'PUBLIC'
+    ORDER BY p.createdAt DESC
+    """)
+    Page<PostEntity> findPublicFeedPosts(@Param("userId") String userId, Pageable pageable);
+
     @Query("SELECT p FROM PostEntity p WHERE p.userId = :userId AND p.isDeleted = false ORDER BY p.createdAt DESC")
     Page<PostEntity> findUserPosts(@Param("userId") String userId, Pageable pageable);
-    
+
     List<PostEntity> findByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(String userId);
 }

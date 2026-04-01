@@ -3,7 +3,7 @@ package com.socialmedia.social_media_social_service.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.socialmedia.social_media_social_service.dto.ReactionDTO.ReactionSummaryResponse;
+import com.socialmedia.social_media_social_service.dto.ReactionDTO.ReactionResponse;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.ReactionsEntity;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
@@ -17,12 +17,12 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class ReactionService {
 
-    private static final String DEFAULT_REACTION_TYPE = "REACT";
+    private static final String DEFAULT_REACTION_TYPE = "LIKE";
 
     private final PostRepository postRepository;
     private final ReactionsRepository reactionsRepository;
 
-    public ReactionSummaryResponse reactToPost(String userId, Long postId) {
+    public ReactionResponse reactToPost(String userId, Long postId) {
         PostEntity post = getActivePost(postId);
 
         boolean reactedByCurrentUser = reactionsRepository.existsByUserIdAndPostId(userId, postId);
@@ -41,7 +41,7 @@ public class ReactionService {
         return buildSummary(post, reactedByCurrentUser);
     }
 
-    public ReactionSummaryResponse removeReaction(String userId, Long postId) {
+    public ReactionResponse removeReaction(String userId, Long postId) {
         PostEntity post = getActivePost(postId);
 
         boolean reactedByCurrentUser = reactionsRepository.existsByUserIdAndPostId(userId, postId);
@@ -56,7 +56,7 @@ public class ReactionService {
     }
 
     @Transactional(readOnly = true)
-    public ReactionSummaryResponse getReactionSummary(String userId, Long postId) {
+    public ReactionResponse getReactionSummary(String userId, Long postId) {
         PostEntity post = getActivePost(postId);
         boolean reactedByCurrentUser = reactionsRepository.existsByUserIdAndPostId(userId, postId);
         return buildSummary(post, reactedByCurrentUser);
@@ -73,8 +73,8 @@ public class ReactionService {
         return post;
     }
 
-    private ReactionSummaryResponse buildSummary(PostEntity post, boolean reactedByCurrentUser) {
-        return ReactionSummaryResponse.builder()
+    private ReactionResponse buildSummary(PostEntity post, boolean reactedByCurrentUser) {
+        return ReactionResponse.builder()
                 .postId(post.getId())
                 .totalReacts(post.getReactionsCount())
                 .reactedByCurrentUser(reactedByCurrentUser)

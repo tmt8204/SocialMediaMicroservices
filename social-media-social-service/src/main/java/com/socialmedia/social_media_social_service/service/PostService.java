@@ -116,12 +116,11 @@ public class PostService {
 
     //----------------NEWSFEED OPERATIONS----------------
     public Page<PostResponse> getFeed(String userId, Pageable pageable) {
-        // Get accepted friends only (NOT including current user)
-        List<String> friendIds = friendRepository.findAcceptedFriendsIds(userId);
+        List<String> friendIds = friendRepository.findAllAcceptedFriendIds(userId);
 
-        // Fetch posts from friends with pagination
-        // Only shows friends' FRIEND and PUBLIC posts, plus PUBLIC posts from others
-        Page<PostEntity> feedPosts = postRepository.findFeedPosts(userId, friendIds, pageable);
+        Page<PostEntity> feedPosts = friendIds.isEmpty()
+                ? postRepository.findPublicFeedPosts(userId, pageable)
+                : postRepository.findFeedPosts(userId, friendIds, pageable);
 
         return feedPosts.map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())));
     }

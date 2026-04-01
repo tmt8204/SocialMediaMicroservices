@@ -1,4 +1,4 @@
-package com.socialmedia.social_media_social_service.dto.ReactionsDTO;
+package com.socialmedia.social_media_social_service.dto.ReactionDTO;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;

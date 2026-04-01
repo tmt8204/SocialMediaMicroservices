@@ -8,8 +8,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.socialmedia.social_media_social_service.dto.ReactionDTO.ReactionSummaryResponse;
+import com.socialmedia.social_media_social_service.dto.ReactionDTO.ReactionResponse;
 import com.socialmedia.social_media_social_service.service.ReactionService;
 
 import lombok.AllArgsConstructor;
@@ -22,21 +21,21 @@ public class ReactionController {
     private final ReactionService reactionService;
 
     @PostMapping("/posts/{postId}/react")
-    public ResponseEntity<ReactionSummaryResponse> reactToPost(
+    public ResponseEntity<ReactionResponse> reactToPost(
             @RequestHeader("X-User-Id") String userId,
             @PathVariable Long postId) {
         return ResponseEntity.ok(reactionService.reactToPost(userId, postId));
     }
 
     @DeleteMapping("/posts/{postId}/react")
-    public ResponseEntity<ReactionSummaryResponse> removeReaction(
+    public ResponseEntity<ReactionResponse> removeReaction(
             @RequestHeader("X-User-Id") String userId,
             @PathVariable Long postId) {
         return ResponseEntity.ok(reactionService.removeReaction(userId, postId));
     }
 
     @GetMapping("/posts/{postId}/reaction-summary")
-    public ResponseEntity<ReactionSummaryResponse> getReactionSummary(
+    public ResponseEntity<ReactionResponse> getReactionSummary(
             @RequestHeader("X-User-Id") String userId,
             @PathVariable Long postId) {
         return ResponseEntity.ok(reactionService.getReactionSummary(userId, postId));
