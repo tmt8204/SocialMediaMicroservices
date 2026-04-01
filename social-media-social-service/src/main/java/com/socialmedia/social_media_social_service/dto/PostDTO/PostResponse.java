@@ -24,6 +24,10 @@ public class PostResponse {
     private List<PostMediaResponse> media = new ArrayList<>();
 
     private List<String> mediaUrls = new ArrayList<>();
+
+    private int totalReacts;
+
+    private boolean reactedByCurrentUser;
     
     private Date createdAt;
     

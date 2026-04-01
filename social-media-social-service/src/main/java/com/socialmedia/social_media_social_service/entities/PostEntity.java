@@ -27,6 +27,12 @@ public class PostEntity extends BaseEntity {
     @Column(name = "content")
     private String content;
 
+    @Column(name = "reactions_count", columnDefinition = "int default 0")
+    private int reactionsCount;
+
+    @Column(name = "comment_count", columnDefinition = "int default 0")
+    private int commentCount;
+
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PostMedia> media = new ArrayList<>();
 

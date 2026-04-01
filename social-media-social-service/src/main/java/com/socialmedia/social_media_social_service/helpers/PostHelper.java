@@ -21,11 +21,17 @@ public class PostHelper {
      * @return PostResponse with all fields populated
      */
     public PostResponse convertToPostResponse(PostEntity post) {
+        return convertToPostResponse(post, false);
+    }
+
+    public PostResponse convertToPostResponse(PostEntity post, boolean reactedByCurrentUser) {
         PostResponse response = new PostResponse();
         response.setId(post.getId());
         response.setUserId(post.getUserId());
         response.setContent(post.getContent());
         response.setVisibility(post.getVisibility());
+        response.setTotalReacts(post.getReactionsCount());
+        response.setReactedByCurrentUser(reactedByCurrentUser);
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());
 

@@ -23,6 +23,7 @@ import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundEx
 import com.socialmedia.social_media_social_service.helpers.PostHelper;
 import com.socialmedia.social_media_social_service.repositories.FriendRepository;
 import com.socialmedia.social_media_social_service.repositories.PostRepository;
+import com.socialmedia.social_media_social_service.repositories.ReactionsRepository;
 
 import lombok.AllArgsConstructor;
 
@@ -35,6 +36,7 @@ public class PostService {
     private final FriendRepository friendRepository;
     private final PostHelper postHelper;
     private final MediaServiceClient mediaServiceClient;
+    private final ReactionsRepository reactionsRepository;
 
     //---------------- POST OPERATIONS ----------------
     public PostResponse createPost(String userId, PostCreateRequest request) {
@@ -48,7 +50,7 @@ public class PostService {
         replacePostMedia(post, request.getMedia(), request.getMediaUrls());
         PostEntity savedPost = postRepository.save(post);
 
-        return postHelper.convertToPostResponse(savedPost);
+        return postHelper.convertToPostResponse(savedPost, hasUserReacted(userId, savedPost.getId()));
     }
 
     public PostResponse updatePost(String userId, Long postId, PostUpdateRequest request) {
@@ -68,14 +70,14 @@ public class PostService {
         PostEntity updatedPost = postRepository.save(post);
         mediaServiceClient.deleteMediaByPublicIds(removedPublicIds);
 
-        return postHelper.convertToPostResponse(updatedPost);
+        return postHelper.convertToPostResponse(updatedPost, hasUserReacted(userId, updatedPost.getId()));
     }
 
     public PostResponse getPostById(String userId, Long postId) {
         PostEntity post = postRepository.findByIdAndUserIdAndIsDeletedFalse(postId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
 
-        return postHelper.convertToPostResponse(post);
+        return postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId()));
     }
 
     // Hide post (soft delete by marking as deleted)
@@ -109,7 +111,7 @@ public class PostService {
     //Get posts of the authenticated user
     public Page<PostResponse> getOwnerPost(String userId, Pageable pageable) {
         Page<PostEntity> userPosts = postRepository.findUserPosts(userId, pageable);
-        return userPosts.map(postHelper::convertToPostResponse);
+        return userPosts.map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())));
     }
 
     //----------------NEWSFEED OPERATIONS----------------
@@ -121,7 +123,7 @@ public class PostService {
         // Only shows friends' FRIEND and PUBLIC posts, plus PUBLIC posts from others
         Page<PostEntity> feedPosts = postRepository.findFeedPosts(userId, friendIds, pageable);
 
-        return feedPosts.map(postHelper::convertToPostResponse);
+        return feedPosts.map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())));
     }
 
     //----------------MEDIA OPERATIONS----------------
@@ -282,6 +284,13 @@ public class PostService {
             return null;
         }
         return value.trim();
+    }
+
+    private boolean hasUserReacted(String userId, Long postId) {
+        if (!StringUtils.hasText(userId) || postId == null) {
+            return false;
+        }
+        return reactionsRepository.existsByUserIdAndPostId(userId, postId);
     }
 
 }

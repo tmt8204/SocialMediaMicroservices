@@ -3,7 +3,6 @@ package com.socialmedia.social_media_social_service.service;
 import java.util.Date;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.socialmedia.social_media_social_service.dto.CommentDTO.CommentCreateRequest;
 import com.socialmedia.social_media_social_service.dto.CommentDTO.CommentResponse;

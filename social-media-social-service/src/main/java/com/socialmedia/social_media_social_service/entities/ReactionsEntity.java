@@ -3,11 +3,13 @@ package com.socialmedia.social_media_social_service.entities;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -17,7 +19,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-@Table(name = "reactions")
+@Table(
+    name = "reactions",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_reaction_user_post", columnNames = {"user_id", "post_id"})
+    },
+    indexes = {
+        @Index(name = "idx_reaction_post", columnList = "post_id")
+    }
+)
 @Entity
 public class ReactionsEntity extends BaseEntity {
 
@@ -31,15 +41,11 @@ public class ReactionsEntity extends BaseEntity {
     @JoinColumn(name = "post_id")
     private PostEntity post;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "comment_id")
-    private CommentEntity comment;
-
     @PrePersist
     @PreUpdate
     private void validateTarget() {
-        if ((post == null && comment == null) || (post != null && comment != null)) {
-            throw new IllegalStateException("Reaction must reference exactly one target: post or comment.");
+        if (post == null) {
+            throw new IllegalStateException("Reaction must reference a post.");
         }
     }
 
