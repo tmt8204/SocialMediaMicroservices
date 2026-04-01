@@ -6,6 +6,7 @@ import java.util.Locale;
 
 import org.springframework.stereotype.Component;
 
+import com.socialmedia.social_media_social_service.dto.PostDTO.PostMediaResponse;
 import com.socialmedia.social_media_social_service.dto.PostDTO.PostResponse;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.PostMedia;
@@ -28,10 +29,22 @@ public class PostHelper {
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());
 
+        List<PostMediaResponse> media = new ArrayList<>();
         List<String> mediaUrls = new ArrayList<>();
         for (PostMedia item : post.getMedia()) {
+            media.add(PostMediaResponse.builder()
+                    .publicId(item.getPublicId())
+                    .mediaUrl(item.getMediaUrl())
+                    .mediaType(item.getMediaType())
+                    .provider(item.getProvider())
+                    .width(item.getWidth())
+                    .height(item.getHeight())
+                    .bytes(item.getBytes())
+                    .build());
             mediaUrls.add(item.getMediaUrl());
         }
+
+        response.setMedia(media);
         response.setMediaUrls(mediaUrls);
 
         return response;

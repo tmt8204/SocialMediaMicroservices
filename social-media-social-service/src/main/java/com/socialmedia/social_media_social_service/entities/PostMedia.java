@@ -23,10 +23,25 @@ public class PostMedia extends BaseEntity {
     @JoinColumn(name = "post_id", nullable = false)
     private PostEntity post;
 
-    @Column(name = "media_url", columnDefinition = "nvarchar(255)")
+    @Column(name = "public_id", columnDefinition = "nvarchar(255)")
+    private String publicId;
+
+    @Column(name = "media_url", columnDefinition = "nvarchar(1000)")
     private String mediaUrl;
 
     @Column(name = "media_type", columnDefinition = "nvarchar(50)")
     private String mediaType = "IMAGE";
+
+    @Column(name = "provider", columnDefinition = "nvarchar(50)")
+    private String provider = "CLOUDINARY";
+
+    @Column(name = "width")
+    private Integer width;
+
+    @Column(name = "height")
+    private Integer height;
+
+    @Column(name = "bytes")
+    private Long bytes;
 
 }

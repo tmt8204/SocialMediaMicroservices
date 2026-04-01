@@ -21,6 +21,8 @@ public class PostResponse {
 
     private String visibility;
 
+    private List<PostMediaResponse> media = new ArrayList<>();
+
     private List<String> mediaUrls = new ArrayList<>();
     
     private Date createdAt;
