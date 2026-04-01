@@ -1,4 +1,4 @@
-package com.socialmedia.social_media_social_service.dto;
+package com.socialmedia.social_media_social_service.dto.PostDTO;
 
 import java.util.ArrayList;
 import java.util.List;

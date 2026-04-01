@@ -9,4 +9,5 @@ import com.socialmedia.social_media_social_service.entities.CommentEntity;
 
 public interface CommentRepository extends JpaRepository<CommentEntity, Long> {
     Optional<List<CommentEntity>> findByPostId(Long postId);
+    Optional<CommentEntity> findByIdAndUserId(Long id, String userId);
 }

@@ -42,15 +42,11 @@ public class JwtService {
 
     private String buildToken(User user, String tokenType, long expirationMs) {
         String userId = user.getId();
-        String username = user.getUsername();
-        String email = user.getEmail();
         String role = user.getRole() != null ? user.getRole().getRoleName() : "USER";
 
         return Jwts.builder()
             .id(UUID.randomUUID().toString())
                 .subject(userId)
-                .claim("user_name", username)
-                .claim("email", email)
                 .claim("role", role)
                 .claim("token_type", tokenType)
                 .issuedAt(new Date())
@@ -65,12 +61,6 @@ public class JwtService {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-    }
-
-    public String extractUsername(String token) {
-        Claims claims = extractClaims(token);
-        String username = claims.get("user_name", String.class);
-        return username != null && !username.isBlank() ? username : claims.getSubject();
     }
 
     public String extractUserId(String token) {

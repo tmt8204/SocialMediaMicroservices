@@ -10,9 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.socialmedia.social_media_social_service.dto.PostCreateRequest;
-import com.socialmedia.social_media_social_service.dto.PostResponse;
-import com.socialmedia.social_media_social_service.dto.PostUpdateRequest;
+import com.socialmedia.social_media_social_service.dto.PostDTO.PostCreateRequest;
+import com.socialmedia.social_media_social_service.dto.PostDTO.PostResponse;
+import com.socialmedia.social_media_social_service.dto.PostDTO.PostUpdateRequest;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.PostMedia;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
@@ -68,17 +68,42 @@ public class PostService {
     }
 
     public PostResponse getPostById(String userId, Long postId) {
-        PostEntity post = postRepository.findByIdAndUserId(postId, userId)
+        PostEntity post = postRepository.findByIdAndUserIdAndIsDeletedFalse(postId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
 
         return postHelper.convertToPostResponse(post);
     }
 
-    public void deletePost(String userId, Long postId){
+    // Hide post (soft delete by marking as deleted)
+    public void hidePost(String userId, Long postId) {
+        PostEntity post = postRepository.findByIdAndUserId(postId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
+
+        post.setDeleted(true);
+        postRepository.save(post);
+    }
+
+    // Unhide post (restore from soft delete)
+    public void unhidePost(String userId, Long postId) {
+        PostEntity post = postRepository.findByIdAndUserId(postId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
+
+        post.setDeleted(false);
+        postRepository.save(post);
+    }
+
+    // Delete post permanently from database
+    public void deletePostPermanently(String userId, Long postId) {
         PostEntity post = postRepository.findByIdAndUserId(postId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
 
         postRepository.delete(post);
+    }
+
+    //Get posts of the authenticated user
+    public Page<PostResponse> getOwnerPost(String userId, Pageable pageable) {
+        Page<PostEntity> userPosts = postRepository.findUserPosts(userId, pageable);
+        return userPosts.map(postHelper::convertToPostResponse);
     }
     
     //----------------NEWSFEED OPERATIONS----------------
@@ -93,11 +118,7 @@ public class PostService {
         return feedPosts.map(postHelper::convertToPostResponse);
     }
     
-    public Page<PostResponse> getOwnerPost(String userId, Pageable pageable) {
-        Page<PostEntity> userPosts = postRepository.findUserPosts(userId, pageable);
-        return userPosts.map(postHelper::convertToPostResponse);
-    }
-
+    //----------------MEDIA OPERATIONS----------------
     private void replacePostMedia(PostEntity post, List<String> mediaUrls) {
         if (post.getMedia() == null) {
             post.setMedia(new ArrayList<>());

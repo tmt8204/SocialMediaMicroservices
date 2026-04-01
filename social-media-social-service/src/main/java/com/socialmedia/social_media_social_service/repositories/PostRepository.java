@@ -15,6 +15,9 @@ public interface PostRepository extends JpaRepository<PostEntity, Long> {
 
     Optional<PostEntity> findByIdAndUserId(Long id, String userId);
     
+    @Query("SELECT p FROM PostEntity p WHERE p.id = :id AND p.userId = :userId AND p.isDeleted = false")
+    Optional<PostEntity> findByIdAndUserIdAndIsDeletedFalse(@Param("id") Long id, @Param("userId") String userId);
+    
     @Query("""
     SELECT p FROM PostEntity p
     WHERE p.isDeleted = false

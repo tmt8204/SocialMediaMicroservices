@@ -62,11 +62,9 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
         }
 
         String userId = claims.getSubject();
-        String userName = claims.get("user_name", String.class);
         String role = claims.get("role", String.class);
-        String email = claims.get("email", String.class);
 
-        if (!StringUtils.hasText(userId) || !StringUtils.hasText(userName) || !StringUtils.hasText(role) || !StringUtils.hasText(email)) {
+        if (!StringUtils.hasText(userId) || !StringUtils.hasText(role) ) {
             return unauthorized(exchange, "Missing required token claims");
         }
 

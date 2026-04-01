@@ -6,7 +6,7 @@ import java.util.Locale;
 
 import org.springframework.stereotype.Component;
 
-import com.socialmedia.social_media_social_service.dto.PostResponse;
+import com.socialmedia.social_media_social_service.dto.PostDTO.PostResponse;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.PostMedia;
 
