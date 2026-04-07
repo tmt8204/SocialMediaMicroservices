@@ -13,6 +13,9 @@ public class CommentResponse {
     
     private Long id;
     private String userId;
+    private String username;
+    private String fullName;
+    private String avatarUrl;
     private String content;
     private Long postId;
     private boolean isDeleted;

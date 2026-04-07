@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.socialmedia.auth.dto.AuthResponse;
@@ -55,8 +56,8 @@ public class UserController {
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<String> changePassword(@Valid @RequestBody ChangePasswordRequest changePasswordRequest, Authentication authentication) {
-        String result = userService.changePassword(authentication, changePasswordRequest);
+    public ResponseEntity<String> changePassword(@RequestHeader("X-User-Id") String userId, @Valid @RequestBody ChangePasswordRequest changePasswordRequest) {
+        String result = userService.changePassword(userId, changePasswordRequest);
         return ResponseEntity.ok(result);
     }
 

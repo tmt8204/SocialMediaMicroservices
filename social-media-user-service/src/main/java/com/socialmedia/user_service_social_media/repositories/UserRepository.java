@@ -3,6 +3,8 @@ package com.socialmedia.user_service_social_media.repositories;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
@@ -15,6 +17,10 @@ public interface UserRepository extends MongoRepository<User, String> {
 	Optional<User> findByUsername(String username);
 
 	Optional<User> findByUsernameIgnoreCase(String username);
+
+	List<User> findByUserIdIn(List<String> userIds);
+
+	Page<User> findByUserIdNotIn(List<String> userIds, Pageable pageable);
 
 	@Query("{ '$or': [ { 'username': { '$regex': ?0, '$options': 'i' } }, { 'fullName': { '$regex': ?0, '$options': 'i' } } ] }")
 	List<User> searchByUsernameOrFullName(String keyword);

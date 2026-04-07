@@ -1,9 +1,13 @@
 package com.socialmedia.social_media_social_service.service;
 
 import java.util.Date;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,7 +16,9 @@ import org.springframework.util.StringUtils;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendActionResponse;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendListItemResponse;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendRequestResponse;
+import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendSuggestionResponse;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.RelationshipStatusResponse;
+import com.socialmedia.social_media_social_service.dto.ProfileDTO.UserProfileSummary;
 import com.socialmedia.social_media_social_service.entities.FriendEntity;
 import com.socialmedia.social_media_social_service.entities.enums.FriendStatus;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
@@ -25,6 +31,8 @@ import lombok.AllArgsConstructor;
 public class FriendService {
 
     private final FriendRepository friendRepository;
+    private final UserProfileClient userProfileClient;
+    private final SocialNotificationEventProducer notificationEventProducer;
 
     public FriendActionResponse sendFriendRequest(String userId, String targetUserId) {
         String requesterId = normalizeRequiredUserId(userId, "userId");
@@ -45,6 +53,7 @@ public class FriendService {
             newRelationship.setCreatedAt(now);
             newRelationship.setUpdatedAt(now);
             friendRepository.save(newRelationship);
+            notificationEventProducer.publishFriendRequestCreated(requesterId, receiverId);
 
             return buildActionResponse(requesterId, receiverId, "PENDING_SENT", "Friend request sent successfully");
         }
@@ -68,6 +77,7 @@ public class FriendService {
         relationship.setActionBy(currentUserId);
         relationship.setUpdatedAt(new Date());
         friendRepository.save(relationship);
+        notificationEventProducer.publishFriendRequestAccepted(currentUserId, senderId);
 
         return buildActionResponse(currentUserId, senderId, "FRIEND", "Friend request accepted");
     }
@@ -136,13 +146,21 @@ public class FriendService {
     public Page<FriendListItemResponse> getFriends(String userId, Pageable pageable) {
         String currentUserId = normalizeRequiredUserId(userId, "userId");
 
-        return friendRepository.findRelationshipsByUserIdAndStatus(currentUserId, FriendStatus.ACCEPTED, pageable)
+        Page<FriendEntity> page = friendRepository.findRelationshipsByUserIdAndStatus(currentUserId, FriendStatus.ACCEPTED, pageable);
+        List<FriendListItemResponse> responses = page.getContent().stream()
                 .map(relationship -> FriendListItemResponse.builder()
                         .otherUserId(resolveOtherUserId(relationship, currentUserId))
                         .status("FRIEND")
                         .requestedAt(relationship.getCreatedAt())
                         .respondedAt(relationship.getUpdatedAt())
-                        .build());
+                .build())
+            .toList();
+
+        Map<String, UserProfileSummary> profiles = userProfileClient.getProfilesByUserIds(
+            responses.stream().map(FriendListItemResponse::getOtherUserId).toList());
+        responses.forEach(response -> applyFriendProfile(response, profiles.get(response.getOtherUserId())));
+
+        return new PageImpl<>(responses, page.getPageable(), page.getTotalElements());
     }
 
     @Transactional(readOnly = true)
@@ -150,14 +168,48 @@ public class FriendService {
         String currentUserId = normalizeRequiredUserId(userId, "userId");
         String normalizedType = StringUtils.hasText(type) ? type.trim().toLowerCase(Locale.ROOT) : "incoming";
 
-        return switch (normalizedType) {
-            case "incoming" -> friendRepository.findByFriendToAndStatusOrderByCreatedAtDesc(currentUserId, FriendStatus.PENDING, pageable)
-                    .map(relationship -> buildPendingResponse(relationship, "PENDING_RECEIVED"));
-            case "outgoing" -> friendRepository.findByUserIdAndStatusOrderByCreatedAtDesc(currentUserId, FriendStatus.PENDING, pageable)
-                    .map(relationship -> buildPendingResponse(relationship, "PENDING_SENT"));
+        Page<FriendEntity> page = switch (normalizedType) {
+            case "incoming" -> friendRepository.findByFriendToAndStatusOrderByCreatedAtDesc(currentUserId, FriendStatus.PENDING, pageable);
+            case "outgoing" -> friendRepository.findByUserIdAndStatusOrderByCreatedAtDesc(currentUserId, FriendStatus.PENDING, pageable);
             default -> throw new IllegalArgumentException("Invalid request type. Allowed values: incoming, outgoing");
         };
+
+        List<FriendRequestResponse> responses = page.getContent().stream()
+            .map(relationship -> buildPendingResponse(relationship, normalizedType))
+            .toList();
+
+        Map<String, UserProfileSummary> profiles = userProfileClient.getProfilesByUserIds(
+            responses.stream()
+                .flatMap(response -> java.util.stream.Stream.of(response.getRequesterId(), response.getTargetUserId()))
+                .toList());
+        responses.forEach(response -> applyFriendRequestProfiles(response, profiles));
+
+        return new PageImpl<>(responses, page.getPageable(), page.getTotalElements());
     }
+
+    @Transactional(readOnly = true)
+    public Page<FriendSuggestionResponse> getFriendSuggestions(String userId, Pageable pageable) {
+        String currentUserId = normalizeRequiredUserId(userId, "userId");
+
+        LinkedHashSet<String> excludedUserIds = new LinkedHashSet<>();
+        excludedUserIds.add(currentUserId);
+        excludedUserIds.addAll(friendRepository.findRelatedUserIdsByUserIdAndStatuses(
+            currentUserId,
+            List.of(FriendStatus.ACCEPTED, FriendStatus.PENDING, FriendStatus.BLOCKED)));
+
+        Page<UserProfileSummary> profilePage = userProfileClient.getDiscoverProfiles(excludedUserIds, pageable);
+        List<FriendSuggestionResponse> suggestions = profilePage.getContent().stream()
+            .map(profile -> FriendSuggestionResponse.builder()
+                .userId(profile.getUserId())
+                .username(profile.getUsername())
+                .fullName(profile.getFullName())
+                .avatarUrl(profile.getAvatarUrl())
+                .relationshipStatus("NOT_FRIEND")
+                .build())
+            .toList();
+
+        return new PageImpl<>(suggestions, pageable, profilePage.getTotalElements());
+    }    
 
     @Transactional(readOnly = true)
     public RelationshipStatusResponse getRelationshipStatus(String userId, String targetUserId) {
@@ -189,6 +241,7 @@ public class FriendService {
                 relationship.setCreatedAt(now);
                 relationship.setUpdatedAt(now);
                 friendRepository.save(relationship);
+                notificationEventProducer.publishFriendRequestCreated(requesterId, receiverId);
                 yield buildActionResponse(requesterId, receiverId, "PENDING_SENT", "Friend request sent successfully");
             }
             case BLOCKED -> throw new IllegalArgumentException("This relationship is blocked");
@@ -206,20 +259,51 @@ public class FriendService {
             relationship.setActionBy(requesterId);
             relationship.setUpdatedAt(now);
             friendRepository.save(relationship);
+            notificationEventProducer.publishFriendRequestAccepted(requesterId, receiverId);
             return buildActionResponse(requesterId, receiverId, "FRIEND", "Friend request accepted");
         }
 
         throw new IllegalArgumentException("Invalid friend relationship state");
     }
 
-    private FriendRequestResponse buildPendingResponse(FriendEntity relationship, String status) {
+    private FriendRequestResponse buildPendingResponse(FriendEntity relationship, String type) {
         return FriendRequestResponse.builder()
                 .requesterId(relationship.getUserId())
                 .targetUserId(relationship.getFriendTo())
-                .status(relationship.getStatus().name())
+                .status("incoming".equals(type) ? "PENDING_RECEIVED" : "PENDING_SENT")
                 .requestedAt(relationship.getCreatedAt())
                 .updatedAt(relationship.getUpdatedAt())
                 .build();
+    }
+
+    private void applyFriendProfile(FriendListItemResponse response, UserProfileSummary profile) {
+        if (response == null || profile == null) {
+            return;
+        }
+
+        response.setUsername(profile.getUsername());
+        response.setFullName(profile.getFullName());
+        response.setAvatarUrl(profile.getAvatarUrl());
+    }
+
+    private void applyFriendRequestProfiles(FriendRequestResponse response, Map<String, UserProfileSummary> profiles) {
+        if (response == null || profiles == null || profiles.isEmpty()) {
+            return;
+        }
+
+        UserProfileSummary requesterProfile = profiles.get(response.getRequesterId());
+        if (requesterProfile != null) {
+            response.setRequesterUsername(requesterProfile.getUsername());
+            response.setRequesterFullName(requesterProfile.getFullName());
+            response.setRequesterAvatarUrl(requesterProfile.getAvatarUrl());
+        }
+
+        UserProfileSummary targetProfile = profiles.get(response.getTargetUserId());
+        if (targetProfile != null) {
+            response.setTargetUsername(targetProfile.getUsername());
+            response.setTargetFullName(targetProfile.getFullName());
+            response.setTargetAvatarUrl(targetProfile.getAvatarUrl());
+        }
     }
 
     private FriendActionResponse buildActionResponse(String userId, String targetUserId, String status, String message) {

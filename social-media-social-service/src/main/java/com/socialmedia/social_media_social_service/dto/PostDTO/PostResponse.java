@@ -17,6 +17,12 @@ public class PostResponse {
 
     private String userId;
 
+    private String username;
+
+    private String fullName;
+
+    private String avatarUrl;
+
     private String content;
 
     private String visibility;
@@ -26,6 +32,8 @@ public class PostResponse {
     private List<String> mediaUrls = new ArrayList<>();
 
     private int totalReacts;
+
+    private int commentCount;
 
     private boolean reactedByCurrentUser;
     

@@ -15,7 +15,19 @@ public class FriendRequestResponse {
 
     private String requesterId;
 
+    private String requesterUsername;
+
+    private String requesterFullName;
+
+    private String requesterAvatarUrl;
+
     private String targetUserId;
+
+    private String targetUsername;
+
+    private String targetFullName;
+
+    private String targetAvatarUrl;
 
     private String status;
 

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.socialmedia.social_media_social_service.dto.PostDTO.PostMediaResponse;
 import com.socialmedia.social_media_social_service.dto.PostDTO.PostResponse;
+import com.socialmedia.social_media_social_service.dto.ProfileDTO.UserProfileSummary;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.PostMedia;
 
@@ -21,16 +22,26 @@ public class PostHelper {
      * @return PostResponse with all fields populated
      */
     public PostResponse convertToPostResponse(PostEntity post) {
-        return convertToPostResponse(post, false);
+        return convertToPostResponse(post, false, null);
     }
 
     public PostResponse convertToPostResponse(PostEntity post, boolean reactedByCurrentUser) {
+        return convertToPostResponse(post, reactedByCurrentUser, null);
+    }
+
+    public PostResponse convertToPostResponse(PostEntity post, boolean reactedByCurrentUser, UserProfileSummary authorProfile) {
         PostResponse response = new PostResponse();
         response.setId(post.getId());
         response.setUserId(post.getUserId());
+        if (authorProfile != null) {
+            response.setUsername(authorProfile.getUsername());
+            response.setFullName(authorProfile.getFullName());
+            response.setAvatarUrl(authorProfile.getAvatarUrl());
+        }
         response.setContent(post.getContent());
         response.setVisibility(post.getVisibility());
         response.setTotalReacts(post.getReactionsCount());
+        response.setCommentCount(post.getCommentCount());
         response.setReactedByCurrentUser(reactedByCurrentUser);
         response.setCreatedAt(post.getCreatedAt());
         response.setUpdatedAt(post.getUpdatedAt());

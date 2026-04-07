@@ -53,6 +53,44 @@ public class CloudinaryMediaService {
     @Value("${app.media.max-video-size-bytes:52428800}")
     private long maxVideoSizeBytes;
 
+    public UploadMediaResponse getUploadedPostMedia(String userId) {
+        String normalizedUserId = normalizeUserId(userId);
+        String folderPrefix = "social-media/posts/" + normalizedUserId;
+
+        List<UploadMediaResponse.MediaItem> items = new ArrayList<>();
+        String nextCursor = null;
+
+        try {
+            do {
+                Map<String, Object> options = new LinkedHashMap<>();
+                options.put("prefix", folderPrefix + "/");
+                options.put("type", "upload");
+                options.put("max_results", 500);
+                if (StringUtils.hasText(nextCursor)) {
+                    options.put("next_cursor", nextCursor);
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> result = cloudinary.api().resources(options);
+
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> resources = (List<Map<String, Object>>) result.getOrDefault("resources", List.of());
+
+                for (Map<String, Object> resource : resources) {
+                    items.add(mapCloudinaryResource(resource));
+                }
+
+                nextCursor = Objects.toString(result.get("next_cursor"), null);
+            } while (StringUtils.hasText(nextCursor));
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to load uploaded media from Cloudinary.", ex);
+        }
+
+        return UploadMediaResponse.builder()
+                .items(items)
+                .build();
+    }
+
     public UploadMediaResponse uploadMedia(List<MultipartFile> files, String userId) {
         validateFiles(files);
         String normalizedUserId = normalizeUserId(userId);
@@ -204,6 +242,19 @@ public class CloudinaryMediaService {
                 .width(toInteger(uploadResult.get("width")))
                 .height(toInteger(uploadResult.get("height")))
                 .bytes(toLong(uploadResult.get("bytes")))
+                .build();
+    }
+
+    private UploadMediaResponse.MediaItem mapCloudinaryResource(Map<String, Object> resource) {
+        String resourceType = Objects.toString(resource.get("resource_type"), "image").toUpperCase(Locale.ROOT);
+        return UploadMediaResponse.MediaItem.builder()
+                .publicId(Objects.toString(resource.get("public_id"), null))
+                .mediaUrl(Objects.toString(resource.get("secure_url"), Objects.toString(resource.get("url"), null)))
+                .mediaType("VIDEO".equals(resourceType) ? "VIDEO" : "IMAGE")
+                .format(Objects.toString(resource.get("format"), null))
+                .width(toInteger(resource.get("width")))
+                .height(toInteger(resource.get("height")))
+                .bytes(toLong(resource.get("bytes")))
                 .build();
     }
 

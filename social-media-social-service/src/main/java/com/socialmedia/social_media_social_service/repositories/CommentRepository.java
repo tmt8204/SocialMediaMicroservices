@@ -8,6 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.socialmedia.social_media_social_service.entities.CommentEntity;
 
 public interface CommentRepository extends JpaRepository<CommentEntity, Long> {
-    Optional<List<CommentEntity>> findByPostId(Long postId);
+    List<CommentEntity> findByPostIdAndIsDeletedFalseOrderByCreatedAtAsc(Long postId);
     Optional<CommentEntity> findByIdAndUserId(Long id, String userId);
 }

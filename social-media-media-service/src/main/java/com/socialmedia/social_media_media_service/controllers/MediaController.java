@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,6 +43,14 @@ public class MediaController {
         String userId = StringUtils.hasText(headerUserId) ? headerUserId : requestUserId;
         UploadMediaResponse response = cloudinaryMediaService.uploadMedia(files, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/my-uploads")
+    public ResponseEntity<UploadMediaResponse> getMyUploadedPostMedia(
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestParam(value = "userId", required = false) String requestUserId) {
+        String userId = StringUtils.hasText(headerUserId) ? headerUserId : requestUserId;
+        return ResponseEntity.ok(cloudinaryMediaService.getUploadedPostMedia(userId));
     }
 
     @DeleteMapping({"/{*publicId}", ""})

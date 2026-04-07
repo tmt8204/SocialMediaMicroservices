@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import com.socialmedia.user_service_social_media.dto.UpdateProfileRequest;
+import com.socialmedia.user_service_social_media.dto.UserProfileSummaryPageResponse;
+import com.socialmedia.user_service_social_media.dto.UserProfileSummaryResponse;
 import com.socialmedia.user_service_social_media.dto.UserResponse;
 import com.socialmedia.user_service_social_media.services.UserService;
 import jakarta.validation.Valid;
@@ -29,6 +31,20 @@ public class UserController {
     public ResponseEntity<UserResponse> getMe(@RequestHeader("X-User-Id") String userId) {
         UserResponse response = userService.getMe(userId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/internal/profiles")
+    public ResponseEntity<List<UserProfileSummaryResponse>> getProfilesByUserIds(
+            @RequestParam("userIds") List<String> userIds) {
+        return ResponseEntity.ok(userService.getProfilesByUserIds(userIds));
+    }
+
+    @GetMapping("/internal/discover")
+    public ResponseEntity<UserProfileSummaryPageResponse> getDiscoverProfiles(
+            @RequestParam(value = "excludeUserIds", required = false) List<String> excludeUserIds,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(userService.getDiscoverProfiles(excludeUserIds, page, size));
     }
 
     @GetMapping("/{username}")

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendActionResponse;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendListItemResponse;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendRequestResponse;
+import com.socialmedia.social_media_social_service.dto.FriendDTO.FriendSuggestionResponse;
 import com.socialmedia.social_media_social_service.dto.FriendDTO.RelationshipStatusResponse;
 import com.socialmedia.social_media_social_service.service.FriendService;
 
@@ -81,6 +82,15 @@ public class FriendController {
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(friendService.getPendingRequests(userId, type, pageable));
+    }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<Page<FriendSuggestionResponse>> getFriendSuggestions(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(friendService.getFriendSuggestions(userId, pageable));
     }
 
     @GetMapping("/relationship/{targetUserId}")

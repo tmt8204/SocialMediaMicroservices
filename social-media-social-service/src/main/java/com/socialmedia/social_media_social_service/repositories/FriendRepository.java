@@ -53,4 +53,16 @@ public interface FriendRepository extends JpaRepository<FriendEntity, Long> {
 
     @Query("SELECT f.userId FROM FriendEntity f WHERE f.friendTo = :userId AND f.status = com.socialmedia.social_media_social_service.entities.enums.FriendStatus.ACCEPTED")
     List<String> findUserIdsWhoAddedAsFollowers(@Param("userId") String userId);
+
+    @Query("""
+        SELECT CASE
+                 WHEN f.userId = :userId THEN f.friendTo
+                 ELSE f.userId
+               END
+        FROM FriendEntity f
+        WHERE (f.userId = :userId OR f.friendTo = :userId)
+          AND f.status IN :statuses
+    """)
+    List<String> findRelatedUserIdsByUserIdAndStatuses(@Param("userId") String userId,
+                                                       @Param("statuses") List<FriendStatus> statuses);
 }

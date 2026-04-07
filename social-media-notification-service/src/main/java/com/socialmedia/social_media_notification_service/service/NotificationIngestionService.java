@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.socialmedia.social_media_notification_service.document.NotificationDocument;
 import com.socialmedia.social_media_notification_service.exception.BadRequestException;
 
 @Service

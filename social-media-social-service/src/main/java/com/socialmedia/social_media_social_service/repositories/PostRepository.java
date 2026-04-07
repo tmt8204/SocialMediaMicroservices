@@ -21,9 +21,9 @@ public interface PostRepository extends JpaRepository<PostEntity, Long> {
     @Query("""
     SELECT p FROM PostEntity p
     WHERE p.isDeleted = false
-    AND p.userId != :userId
     AND (
-        (p.userId IN :friendIds AND (p.visibility = 'FRIEND' OR p.visibility = 'PUBLIC'))
+        (p.userId = :userId)
+        OR (p.userId IN :friendIds AND (p.visibility = 'FRIEND' OR p.visibility = 'PUBLIC'))
         OR (p.visibility = 'PUBLIC')
     )
     ORDER BY p.createdAt DESC
@@ -33,8 +33,10 @@ public interface PostRepository extends JpaRepository<PostEntity, Long> {
     @Query("""
     SELECT p FROM PostEntity p
     WHERE p.isDeleted = false
-    AND p.userId != :userId
-    AND p.visibility = 'PUBLIC'
+    AND (
+        p.userId = :userId
+        OR p.visibility = 'PUBLIC'
+    )
     ORDER BY p.createdAt DESC
     """)
     Page<PostEntity> findPublicFeedPosts(@Param("userId") String userId, Pageable pageable);

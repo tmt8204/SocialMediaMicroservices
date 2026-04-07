@@ -69,7 +69,7 @@ public class NotificationMapper {
             return Optional.empty();
         }
 
-        SocialMapping mapping = resolveSocialMapping(eventType, event);
+        SocialMapping mapping = resolveSocialMapping(eventType, actorId, event);
         Map<String, Object> metadata = new LinkedHashMap<>();
         putIfPresent(metadata, "postId", firstText(event, "postId"));
         putIfPresent(metadata, "commentId", firstText(event, "commentId"));
@@ -94,7 +94,7 @@ public class NotificationMapper {
                 .build());
     }
 
-    private SocialMapping resolveSocialMapping(String eventType, JsonNode event) {
+    private SocialMapping resolveSocialMapping(String eventType, String actorId, JsonNode event) {
         String postId = firstText(event, "postId");
         String commentId = firstText(event, "commentId");
 
@@ -114,6 +114,21 @@ public class NotificationMapper {
                     "COMMENT",
                     requiredValue(commentId, "commentId is required for SOCIAL_COMMENT_REACTION_CREATED"),
                     buildPostsDeeplink(postId, firstText(event, "deeplink")));
+            case "SOCIAL_POST_CREATED" -> new SocialMapping(
+                    "Co bai viet moi",
+                    "POST",
+                    requiredValue(postId, "postId is required for SOCIAL_POST_CREATED"),
+                    buildPostsDeeplink(postId, firstText(event, "deeplink")));
+            case "SOCIAL_FRIEND_REQUEST_CREATED" -> new SocialMapping(
+                    "Co loi moi ket ban moi",
+                    "USER",
+                    requiredValue(actorId, "actorId is required for SOCIAL_FRIEND_REQUEST_CREATED"),
+                    firstText(event, "deeplink") != null ? firstText(event, "deeplink") : "/friends/requests");
+            case "SOCIAL_FRIEND_REQUEST_ACCEPTED" -> new SocialMapping(
+                    "Loi moi ket ban da duoc chap nhan",
+                    "USER",
+                    requiredValue(actorId, "actorId is required for SOCIAL_FRIEND_REQUEST_ACCEPTED"),
+                    firstText(event, "deeplink") != null ? firstText(event, "deeplink") : "/friends");
             default -> throw new BadRequestException("Unsupported social eventType: " + eventType);
         };
     }

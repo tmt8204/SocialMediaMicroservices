@@ -9,14 +9,14 @@ import com.socialmedia.social_media_social_service.entities.CommentEntity;
 public class CommentHelper {
     
     public CommentResponse convertToCommentResponse(CommentEntity comment) {
-        return new CommentResponse(
-            comment.getId(),
-            comment.getUserId(),
-            comment.getContent(),
-            comment.getPost().getId(),
-            comment.isDeleted(),
-            comment.getCreatedAt(),
-            comment.getUpdatedAt()
-        );
+        CommentResponse response = new CommentResponse();
+        response.setId(comment.getId());
+        response.setUserId(comment.getUserId());
+        response.setContent(comment.getContent());
+        response.setPostId(comment.getPost().getId());
+        response.setDeleted(comment.isDeleted());
+        response.setCreatedAt(comment.getCreatedAt());
+        response.setUpdatedAt(comment.getUpdatedAt());
+        return response;
     }
 }

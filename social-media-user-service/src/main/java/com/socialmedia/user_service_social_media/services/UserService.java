@@ -1,11 +1,19 @@
 package com.socialmedia.user_service_social_media.services;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import com.socialmedia.user_service_social_media.dto.UpdateProfileRequest;
+import com.socialmedia.user_service_social_media.dto.UserProfileSummaryPageResponse;
+import com.socialmedia.user_service_social_media.dto.UserProfileSummaryResponse;
 import com.socialmedia.user_service_social_media.dto.UserResponse;
 import com.socialmedia.user_service_social_media.entities.User;
 import com.socialmedia.user_service_social_media.repositories.UserRepository;
@@ -45,6 +53,50 @@ public class UserService {
                 .map(this::toUserResponse)
                 .toList();
     }
+
+    public List<UserProfileSummaryResponse> getProfilesByUserIds(List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> normalizedUserIds = userIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        if (normalizedUserIds.isEmpty()) {
+            return List.of();
+        }
+
+        return userRepository.findByUserIdIn(List.copyOf(normalizedUserIds))
+                .stream()
+                .map(this::toUserProfileSummary)
+                .toList();
+    }
+
+        public UserProfileSummaryPageResponse getDiscoverProfiles(List<String> excludeUserIds, int page, int size) {
+        Set<String> normalizedExcludedIds = excludeUserIds == null
+            ? new LinkedHashSet<>()
+            : excludeUserIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "username"));
+        Page<User> userPage = normalizedExcludedIds.isEmpty()
+            ? userRepository.findAll(pageable)
+            : userRepository.findByUserIdNotIn(List.copyOf(normalizedExcludedIds), pageable);
+
+        return new UserProfileSummaryPageResponse(
+            userPage.getContent().stream().map(this::toUserProfileSummary).toList(),
+            userPage.getNumber(),
+            userPage.getSize(),
+            userPage.getTotalElements(),
+            userPage.getTotalPages(),
+            userPage.isFirst(),
+            userPage.isLast(),
+            userPage.isEmpty());
+        }
         
     public UserResponse updateProfile(String userId, UpdateProfileRequest request) {
         User user = userRepository.findByUserId(userId)
@@ -92,6 +144,14 @@ public class UserService {
         response.setUpdateAt(user.getUpdateAt());
 
         return response;
+    }
+
+    private UserProfileSummaryResponse toUserProfileSummary(User user) {
+        return new UserProfileSummaryResponse(
+                user.getUserId(),
+                user.getUsername(),
+                user.getFullName(),
+                user.getAvatarUrl());
     }
 
 }

@@ -16,4 +16,6 @@ public class ReactionResponse {
     private int totalReacts;
 
     private boolean reactedByCurrentUser;
+
+    private String reactionType;
 }

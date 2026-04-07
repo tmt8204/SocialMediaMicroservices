@@ -192,13 +192,14 @@ public class UserService {
     }
 
     // -------------------- Change Password ------------------- //
-    public String changePassword(Authentication authentication, ChangePasswordRequest changePasswordRequest) {
+    //dùng jwt đã decode trong gateway để lấy X-User-Id rồi tìm user trong db, sau đó check password cũ có đúng không, nếu đúng thì update password mới, đồng thời xóa hết token cũ đi để bắt đăng nhập lại
+    public String changePassword(String userId, ChangePasswordRequest changePasswordRequest) {
         // Validate input
-        if (authentication == null || authentication.getName().isBlank()) {
+        if (userId == null || userId.isBlank()) {
             throw new UnauthorizedException("Unauthorized");
         }
 
-        User user = userRepository.findByUsername(authentication.getName())
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BadRequestException("User not found"));
 
         if (!passwordEncoder.matches(changePasswordRequest.getCurrentPassword(), user.getPasswordHash())) {

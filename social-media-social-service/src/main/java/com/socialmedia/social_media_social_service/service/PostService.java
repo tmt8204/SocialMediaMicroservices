@@ -5,9 +5,11 @@ import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import com.socialmedia.social_media_social_service.dto.PostDTO.PostCreateRequest
 import com.socialmedia.social_media_social_service.dto.PostDTO.PostMediaRequest;
 import com.socialmedia.social_media_social_service.dto.PostDTO.PostResponse;
 import com.socialmedia.social_media_social_service.dto.PostDTO.PostUpdateRequest;
+import com.socialmedia.social_media_social_service.dto.ProfileDTO.UserProfileSummary;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.PostMedia;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
@@ -37,6 +40,8 @@ public class PostService {
     private final PostHelper postHelper;
     private final MediaServiceClient mediaServiceClient;
     private final ReactionsRepository reactionsRepository;
+    private final UserProfileClient userProfileClient;
+    private final SocialNotificationEventProducer notificationEventProducer;
 
     //---------------- POST OPERATIONS ----------------
     public PostResponse createPost(String userId, PostCreateRequest request) {
@@ -50,7 +55,9 @@ public class PostService {
         replacePostMedia(post, request.getMedia(), request.getMediaUrls());
         PostEntity savedPost = postRepository.save(post);
 
-        return postHelper.convertToPostResponse(savedPost, hasUserReacted(userId, savedPost.getId()));
+        publishPostCreatedNotification(userId, savedPost);
+
+        return enrichPostResponse(postHelper.convertToPostResponse(savedPost, hasUserReacted(userId, savedPost.getId())));
     }
 
     public PostResponse updatePost(String userId, Long postId, PostUpdateRequest request) {
@@ -70,14 +77,14 @@ public class PostService {
         PostEntity updatedPost = postRepository.save(post);
         mediaServiceClient.deleteMediaByPublicIds(removedPublicIds);
 
-        return postHelper.convertToPostResponse(updatedPost, hasUserReacted(userId, updatedPost.getId()));
+        return enrichPostResponse(postHelper.convertToPostResponse(updatedPost, hasUserReacted(userId, updatedPost.getId())));
     }
 
     public PostResponse getPostById(String userId, Long postId) {
         PostEntity post = postRepository.findByIdAndUserIdAndIsDeletedFalse(postId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
 
-        return postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId()));
+        return enrichPostResponse(postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())));
     }
 
     // Hide post (soft delete by marking as deleted)
@@ -111,7 +118,10 @@ public class PostService {
     //Get posts of the authenticated user
     public Page<PostResponse> getOwnerPost(String userId, Pageable pageable) {
         Page<PostEntity> userPosts = postRepository.findUserPosts(userId, pageable);
-        return userPosts.map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())));
+        List<PostResponse> responses = userPosts.getContent().stream()
+                .map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())))
+                .toList();
+        return enrichPostPage(userPosts, responses);
     }
 
     //----------------NEWSFEED OPERATIONS----------------
@@ -122,7 +132,39 @@ public class PostService {
                 ? postRepository.findPublicFeedPosts(userId, pageable)
                 : postRepository.findFeedPosts(userId, friendIds, pageable);
 
-        return feedPosts.map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())));
+        List<PostResponse> responses = feedPosts.getContent().stream()
+                .map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())))
+                .toList();
+        return enrichPostPage(feedPosts, responses);
+    }
+
+    private PostResponse enrichPostResponse(PostResponse response) {
+        if (response == null || !StringUtils.hasText(response.getUserId())) {
+            return response;
+        }
+
+        Map<String, UserProfileSummary> profiles = userProfileClient.getProfilesByUserIds(List.of(response.getUserId()));
+        applyAuthorProfile(response, profiles.get(response.getUserId()));
+        return response;
+    }
+
+    private Page<PostResponse> enrichPostPage(Page<PostEntity> sourcePage, List<PostResponse> responses) {
+        Map<String, UserProfileSummary> profiles = userProfileClient.getProfilesByUserIds(
+                responses.stream().map(PostResponse::getUserId).toList());
+
+        responses.forEach(response -> applyAuthorProfile(response, profiles.get(response.getUserId())));
+
+        return new PageImpl<>(responses, sourcePage.getPageable(), sourcePage.getTotalElements());
+    }
+
+    private void applyAuthorProfile(PostResponse response, UserProfileSummary profile) {
+        if (response == null || profile == null) {
+            return;
+        }
+
+        response.setUsername(profile.getUsername());
+        response.setFullName(profile.getFullName());
+        response.setAvatarUrl(profile.getAvatarUrl());
     }
 
     //----------------MEDIA OPERATIONS----------------
@@ -290,6 +332,28 @@ public class PostService {
             return false;
         }
         return reactionsRepository.existsByUserIdAndPostId(userId, postId);
+    }
+
+    private void publishPostCreatedNotification(String authorId, PostEntity savedPost) {
+        String visibility = savedPost.getVisibility();
+        if ("PRIVATE".equals(visibility)) {
+            return;
+        }
+
+        List<String> recipientIds = friendRepository.findAllAcceptedFriendIds(authorId);
+        if (recipientIds.isEmpty()) {
+            return;
+        }
+
+        String content = savedPost.getContent();
+        String preview;
+        if (content != null && !content.isBlank()) {
+            preview = content.length() > 100 ? content.substring(0, 100) : content;
+        } else {
+            preview = "Da dang bai viet moi";
+        }
+
+        notificationEventProducer.publishPostCreated(authorId, savedPost.getId(), preview, recipientIds);
     }
 
 }
