@@ -5,12 +5,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.socialmedia.auth.dto.AuthResponse;
 import com.socialmedia.auth.dto.ChangePasswordRequest;
 import com.socialmedia.auth.dto.CreateProfileEvent;
 import com.socialmedia.auth.dto.ForgotPasswordRequest;
+import com.socialmedia.auth.dto.IssuedAuthTokens;
 import com.socialmedia.auth.dto.LoginRequest;
 import com.socialmedia.auth.dto.RegisterRequest;
 import com.socialmedia.auth.dto.ResetPasswordRequest;
@@ -71,7 +71,7 @@ public class UserService {
     }
 
     // -------------------- User Registration ------------------- //
-    public AuthResponse registerUser(RegisterRequest registerRequest) {
+    public IssuedAuthTokens registerUser(RegisterRequest registerRequest) {
 
         // Validate input
         if (userRepository.existsByUsername(registerRequest.getUsername())) {
@@ -126,7 +126,7 @@ public class UserService {
     }
 
     // -------------------- User Login ------------------- //
-    public AuthResponse loginUser(LoginRequest loginRequest) {
+    public IssuedAuthTokens loginUser(LoginRequest loginRequest) {
         // Validate input
         String username = loginRequest.getUsername();
         String password = loginRequest.getPassword();
@@ -180,12 +180,13 @@ public class UserService {
     
 
     // -------------------- User Logout ------------------- //
-    public void logout(Authentication authentication) {
-        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+    public void logout(String accessToken, String refreshToken) {
+        String userId = extractUserIdForLogout(accessToken, refreshToken);
+        if (userId == null || userId.isBlank()) {
             throw new UnauthorizedException("Unauthorized");
         }
 
-        User user = userRepository.findByUsername(authentication.getName())
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BadRequestException("User not found"));
 
         userTokenRepository.deleteByUserId(user.getId());
@@ -227,7 +228,7 @@ public class UserService {
     }
 
     // -------------------- JWT ------------------- //
-    public AuthResponse refreshToken(String refreshToken) {
+    public IssuedAuthTokens refreshToken(String refreshToken) {
         // Validate input
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new BadRequestException("Refresh token is required");
@@ -249,7 +250,7 @@ public class UserService {
         return issueTokens(user);
     }
 
-    private AuthResponse issueTokens(User user) {
+    private IssuedAuthTokens issueTokens(User user) {
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
@@ -257,14 +258,33 @@ public class UserService {
         saveToken(user.getId(), refreshToken, TokenType.REFRESH, jwtService.extractExpiration(refreshToken).toInstant());
 
         String roleName = user.getRole() != null ? user.getRole().getRoleName() : DEFAULT_ROLE;
-        return new AuthResponse(
-            accessToken,
-            refreshToken,
-            user.getId(),
-            user.getUsername(),
-            user.getEmail(),
-            user.getFullName(),
-            roleName);
+        return new IssuedAuthTokens(
+            new AuthResponse(
+                accessToken,
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getFullName(),
+                roleName),
+            refreshToken);
+    }
+
+    private String extractUserIdForLogout(String accessToken, String refreshToken) {
+        if (accessToken != null && !accessToken.isBlank()
+                && jwtService.isTokenValid(accessToken)
+                && jwtService.isAccessToken(accessToken)
+                && userTokenRepository.findByTokenAndTokenTypeAndRevokedFalse(accessToken, TokenType.ACCESS).isPresent()) {
+            return jwtService.extractUserId(accessToken);
+        }
+
+        if (refreshToken != null && !refreshToken.isBlank()
+                && jwtService.isTokenValid(refreshToken)
+                && jwtService.isRefreshToken(refreshToken)
+                && userTokenRepository.findByTokenAndTokenTypeAndRevokedFalse(refreshToken, TokenType.REFRESH).isPresent()) {
+            return jwtService.extractUserId(refreshToken);
+        }
+
+        return null;
     }
 
     private void saveToken(String userId, String token, TokenType tokenType, Instant expiresAt) {
