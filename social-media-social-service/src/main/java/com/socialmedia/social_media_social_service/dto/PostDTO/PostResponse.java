@@ -27,6 +27,12 @@ public class PostResponse {
 
     private String visibility;
 
+    private String postContext;
+
+    private Long communityId;
+
+    private String communityName;
+
     private List<PostMediaResponse> media = new ArrayList<>();
 
     private List<String> mediaUrls = new ArrayList<>();

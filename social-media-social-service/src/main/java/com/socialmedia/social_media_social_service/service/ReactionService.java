@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.socialmedia.social_media_social_service.dto.ReactionDTO.ReactionResponse;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.ReactionsEntity;
+import com.socialmedia.social_media_social_service.entities.enums.PostContextType;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
 import com.socialmedia.social_media_social_service.repositories.PostRepository;
 import com.socialmedia.social_media_social_service.repositories.ReactionsRepository;
@@ -24,10 +25,11 @@ public class ReactionService {
     private final PostRepository postRepository;
     private final ReactionsRepository reactionsRepository;
     private final SocialNotificationEventProducer notificationEventProducer;
+    private final CommunityService communityService;
 
     public ReactionResponse reactToPost(String userId, Long postId, String type) {
         log.debug("reactToPost: userId={} postId={} type={}", userId, postId, type);
-        PostEntity post = getActivePost(postId);
+        PostEntity post = getActivePost(userId, postId);
         String resolvedType = resolveType(type);
 
         java.util.Optional<ReactionsEntity> existing = reactionsRepository.findByUserIdAndPostId(userId, postId);
@@ -63,7 +65,7 @@ public class ReactionService {
 
     public ReactionResponse removeReaction(String userId, Long postId) {
         log.debug("removeReaction: userId={} postId={}", userId, postId);
-        PostEntity post = getActivePost(postId);
+        PostEntity post = getActivePost(userId, postId);
 
         boolean reactedByCurrentUser = reactionsRepository.existsByUserIdAndPostId(userId, postId);
         if (reactedByCurrentUser) {
@@ -80,7 +82,7 @@ public class ReactionService {
 
     @Transactional(readOnly = true)
     public ReactionResponse getReactionSummary(String userId, Long postId) {
-        PostEntity post = getActivePost(postId);
+        PostEntity post = getActivePost(userId, postId);
         java.util.Optional<ReactionsEntity> existing = reactionsRepository.findByUserIdAndPostId(userId, postId);
         boolean reacted = existing.isPresent();
         String type = reacted ? existing.get().getType() : null;
@@ -88,13 +90,17 @@ public class ReactionService {
     }
 
     private PostEntity getActivePost(Long postId) {
-        PostEntity post = postRepository.findById(postId)
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
 
-        if (post.isDeleted()) {
-            throw new IllegalStateException("Post was deleted");
-        }
+        return post;
+    }
 
+    private PostEntity getActivePost(String userId, Long postId) {
+        PostEntity post = getActivePost(postId);
+        if (post.getPostContext() == PostContextType.COMMUNITY) {
+            communityService.requireReadableCommunity(userId, post.getCommunityId());
+        }
         return post;
     }
 

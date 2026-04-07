@@ -34,7 +34,7 @@ public class CommentController {
     public ResponseEntity<List<CommentResponse>> getCommentsByPostId(
             @RequestHeader("X-User-Id") String userId,
             @PathVariable Long postId) {
-        return ResponseEntity.ok(commentService.getCommentsByPostId(postId));
+        return ResponseEntity.ok(commentService.getCommentsByPostId(userId, postId));
     }
 
     @PostMapping("/posts/{postId}/comments")

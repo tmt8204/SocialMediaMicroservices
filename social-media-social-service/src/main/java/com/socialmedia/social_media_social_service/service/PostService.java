@@ -22,6 +22,8 @@ import com.socialmedia.social_media_social_service.dto.PostDTO.PostUpdateRequest
 import com.socialmedia.social_media_social_service.dto.ProfileDTO.UserProfileSummary;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.PostMedia;
+import com.socialmedia.social_media_social_service.entities.enums.CommunityMemberStatus;
+import com.socialmedia.social_media_social_service.entities.enums.PostContextType;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
 import com.socialmedia.social_media_social_service.helpers.PostHelper;
 import com.socialmedia.social_media_social_service.repositories.FriendRepository;
@@ -42,13 +44,18 @@ public class PostService {
     private final ReactionsRepository reactionsRepository;
     private final UserProfileClient userProfileClient;
     private final SocialNotificationEventProducer notificationEventProducer;
+    private final CommunityService communityService;
 
     //---------------- POST OPERATIONS ----------------
     public PostResponse createPost(String userId, PostCreateRequest request) {
+        validatePostPayload(request.getContent(), request.getMedia(), request.getMediaUrls());
+
         PostEntity post = new PostEntity();
         post.setUserId(userId);
-        post.setContent(request.getContent());
+        post.setContent(normalizeContent(request.getContent()));
         post.setVisibility(postHelper.resolveVisibility(request.getVisibility()));
+        post.setCommunityId(null);
+        post.setPostContext(PostContextType.PROFILE);
         post.setCreatedAt(new Date());
         post.setUpdatedAt(new Date());
 
@@ -61,6 +68,7 @@ public class PostService {
     }
 
     public PostResponse updatePost(String userId, Long postId, PostUpdateRequest request) {
+        validatePostPayload(request.getContent(), request.getMedia(), request.getMediaUrls());
 
         // Ensure the post exists and belongs to the user
         PostEntity post = postRepository.findByIdAndUserId(postId, userId)
@@ -68,7 +76,7 @@ public class PostService {
 
         List<String> removedPublicIds = extractRemovedPublicIds(post.getMedia(), request.getMedia(), request.getMediaUrls());
 
-        post.setContent(request.getContent());
+        post.setContent(normalizeContent(request.getContent()));
         post.setVisibility(postHelper.resolveVisibility(request.getVisibility()));
         post.setUpdatedAt(new Date());
 
@@ -81,10 +89,31 @@ public class PostService {
     }
 
     public PostResponse getPostById(String userId, Long postId) {
-        PostEntity post = postRepository.findByIdAndUserIdAndIsDeletedFalse(postId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
+
+        validateCanReadPost(userId, post);
 
         return enrichPostResponse(postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())));
+    }
+
+    public PostResponse createCommunityPost(String userId, Long communityId, PostCreateRequest request) {
+        communityService.requireWritableCommunity(userId, communityId);
+        validatePostPayload(request.getContent(), request.getMedia(), request.getMediaUrls());
+
+        PostEntity post = new PostEntity();
+        post.setUserId(userId);
+        post.setContent(normalizeContent(request.getContent()));
+        post.setVisibility(postHelper.resolveVisibility(request.getVisibility()));
+        post.setCommunityId(communityId);
+        post.setPostContext(PostContextType.COMMUNITY);
+        post.setCreatedAt(new Date());
+        post.setUpdatedAt(new Date());
+
+        replacePostMedia(post, request.getMedia(), request.getMediaUrls());
+        PostEntity savedPost = postRepository.save(post);
+
+        return enrichPostResponse(postHelper.convertToPostResponse(savedPost, hasUserReacted(userId, savedPost.getId())));
     }
 
     // Hide post (soft delete by marking as deleted)
@@ -127,15 +156,35 @@ public class PostService {
     //----------------NEWSFEED OPERATIONS----------------
     public Page<PostResponse> getFeed(String userId, Pageable pageable) {
         List<String> friendIds = friendRepository.findAllAcceptedFriendIds(userId);
+        List<Long> joinedCommunityIds = communityService == null
+                ? List.of()
+                : communityService.getJoinedCommunityIds(userId);
 
-        Page<PostEntity> feedPosts = friendIds.isEmpty()
-                ? postRepository.findPublicFeedPosts(userId, pageable)
-                : postRepository.findFeedPosts(userId, friendIds, pageable);
+        Page<PostEntity> feedPosts;
+        if (friendIds.isEmpty() && joinedCommunityIds.isEmpty()) {
+            feedPosts = postRepository.findPublicFeedPosts(userId, pageable);
+        } else if (joinedCommunityIds.isEmpty()) {
+            feedPosts = postRepository.findFeedPostsWithFriends(userId, friendIds, pageable);
+        } else if (friendIds.isEmpty()) {
+            feedPosts = postRepository.findFeedPostsWithCommunities(userId, joinedCommunityIds, pageable);
+        } else {
+            feedPosts = postRepository.findFeedPosts(userId, friendIds, joinedCommunityIds, pageable);
+        }
 
         List<PostResponse> responses = feedPosts.getContent().stream()
                 .map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())))
                 .toList();
         return enrichPostPage(feedPosts, responses);
+    }
+
+    public Page<PostResponse> getCommunityPosts(String userId, Long communityId, Pageable pageable) {
+        communityService.requireReadableCommunity(userId, communityId);
+
+        Page<PostEntity> communityPosts = postRepository.findCommunityPosts(communityId, pageable);
+        List<PostResponse> responses = communityPosts.getContent().stream()
+                .map(post -> postHelper.convertToPostResponse(post, hasUserReacted(userId, post.getId())))
+                .toList();
+        return enrichPostPage(communityPosts, responses);
     }
 
     private PostResponse enrichPostResponse(PostResponse response) {
@@ -145,16 +194,48 @@ public class PostService {
 
         Map<String, UserProfileSummary> profiles = userProfileClient.getProfilesByUserIds(List.of(response.getUserId()));
         applyAuthorProfile(response, profiles.get(response.getUserId()));
+        applyCommunityMetadata(response, loadCommunityNames(List.of(response)));
         return response;
     }
 
     private Page<PostResponse> enrichPostPage(Page<PostEntity> sourcePage, List<PostResponse> responses) {
         Map<String, UserProfileSummary> profiles = userProfileClient.getProfilesByUserIds(
                 responses.stream().map(PostResponse::getUserId).toList());
+        Map<Long, String> communityNames = loadCommunityNames(responses);
 
-        responses.forEach(response -> applyAuthorProfile(response, profiles.get(response.getUserId())));
+        responses.forEach(response -> {
+            applyAuthorProfile(response, profiles.get(response.getUserId()));
+            applyCommunityMetadata(response, communityNames);
+        });
 
         return new PageImpl<>(responses, sourcePage.getPageable(), sourcePage.getTotalElements());
+    }
+
+    private void validateCanReadPost(String userId, PostEntity post) {
+        if (post.getPostContext() == PostContextType.COMMUNITY) {
+            if (post.getCommunityId() == null) {
+                throw new IllegalStateException("Community post is missing communityId");
+            }
+            communityService.requireReadableCommunity(userId, post.getCommunityId());
+            return;
+        }
+
+        if (userId.equals(post.getUserId())) {
+            return;
+        }
+
+        if ("PUBLIC".equalsIgnoreCase(post.getVisibility())) {
+            return;
+        }
+
+        if ("FRIEND".equalsIgnoreCase(post.getVisibility())) {
+            List<String> friendIds = friendRepository.findAllAcceptedFriendIds(userId);
+            if (friendIds.contains(post.getUserId())) {
+                return;
+            }
+        }
+
+        throw new ResourceNotFoundException("Post not found with id: " + post.getId());
     }
 
     private void applyAuthorProfile(PostResponse response, UserProfileSummary profile) {
@@ -165,6 +246,62 @@ public class PostService {
         response.setUsername(profile.getUsername());
         response.setFullName(profile.getFullName());
         response.setAvatarUrl(profile.getAvatarUrl());
+    }
+
+    private Map<Long, String> loadCommunityNames(List<PostResponse> responses) {
+        List<Long> communityIds = responses.stream()
+                .map(PostResponse::getCommunityId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (communityIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return communityService.getCommunityNamesByIds(communityIds);
+    }
+
+    private void applyCommunityMetadata(PostResponse response, Map<Long, String> communityNames) {
+        if (response == null || response.getCommunityId() == null) {
+            return;
+        }
+
+        response.setCommunityName(communityNames.get(response.getCommunityId()));
+    }
+
+    private void validatePostPayload(String content, List<PostMediaRequest> media, List<String> mediaUrls) {
+        if (!StringUtils.hasText(content) && !hasAnyMedia(media, mediaUrls)) {
+            throw new IllegalArgumentException("Post must contain content or at least one media item");
+        }
+    }
+
+    private boolean hasAnyMedia(List<PostMediaRequest> media, List<String> mediaUrls) {
+        if (media != null) {
+            for (PostMediaRequest item : media) {
+                if (item != null && StringUtils.hasText(item.getMediaUrl())) {
+                    return true;
+                }
+            }
+        }
+
+        if (mediaUrls != null) {
+            for (String mediaUrl : mediaUrls) {
+                if (StringUtils.hasText(mediaUrl)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private String normalizeContent(String content) {
+        if (!StringUtils.hasText(content)) {
+            return null;
+        }
+
+        return content.trim();
     }
 
     //----------------MEDIA OPERATIONS----------------

@@ -3,9 +3,13 @@ package com.socialmedia.social_media_social_service.entities;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.socialmedia.social_media_social_service.entities.enums.PostContextType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -38,6 +42,13 @@ public class PostEntity extends BaseEntity {
 
     @Column(name = "visibility", columnDefinition = "nvarchar(255) default 'PUBLIC'")
     private String visibility;
+
+    @Column(name = "community_id")
+    private Long communityId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "post_context", nullable = false, length = 50)
+    private PostContextType postContext = PostContextType.PROFILE;
 
     @Column(name = "is_deleted", columnDefinition = "bit default 0")
     private boolean isDeleted = false;

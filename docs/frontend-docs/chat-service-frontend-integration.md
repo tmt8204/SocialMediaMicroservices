@@ -229,6 +229,17 @@ Payload là `MessageResponse`:
 - `DELIVERED`
 - `SEEN`
 
+`memberRole` trong conversation:
+
+- `OWNER`
+- `ADMIN`
+- `MEMBER`
+
+`conversationType`:
+
+- `DIRECT`
+- `GROUP`
+
 ## 3.4. JSON khi nhận event read/typing/recall
 
 Destination khuyến nghị:
@@ -437,7 +448,53 @@ Rule:
 - backend trả messages theo `seqNo desc`
 - FE thường sẽ cần reverse list ở UI nếu muốn hiển thị cũ -> mới
 
-## 4.4. Mark as read
+## 4.4. Lấy danh sách member của conversation
+
+### Method + URL
+
+- `GET /api/chat/conversations/{conversationId}/members`
+
+Response (array):
+
+```json
+[
+  {
+    "conversationId": "67ef2b4d9ab123456789abcd",
+    "userId": "userA",
+    "role": "OWNER",
+    "lastReadMessageId": "67ef2d129ab123456789abce",
+    "lastReadAt": "2026-04-06T10:05:00Z",
+    "unreadCount": 0,
+    "muted": false,
+    "pinned": false,
+    "hidden": false
+  },
+  {
+    "conversationId": "67ef2b4d9ab123456789abcd",
+    "userId": "userB",
+    "role": "MEMBER",
+    "lastReadMessageId": null,
+    "lastReadAt": null,
+    "unreadCount": 3,
+    "muted": false,
+    "pinned": false,
+    "hidden": false
+  }
+]
+```
+
+Field:
+
+- `role`: `OWNER` | `ADMIN` | `MEMBER`
+- `unreadCount`: số message chưa đọc của member đó
+- `lastReadMessageId`: message cuối member đó đã đọc tới
+- `muted`, `pinned`, `hidden`: preference của member đó trong conversation
+
+Lưu ý: đây là nội bộ conversation, hiện chưa expose `unreadCount` trong `ConversationResponse` từ `GET /api/chat/conversations`. Nếu cần badge unread trên màn danh sách, frontend có thể gọi endpoint này hoặc track local từ realtime event.
+
+---
+
+## 4.5. Mark as read
 
 ### Method + URL
 
@@ -466,7 +523,7 @@ Rule:
 - đánh dấu các message từ người khác là `SEEN` tới boundary tương ứng
 - publish read event ra Kafka
 
-## 4.5. Recall message
+## 4.6. Recall message
 
 ### Method + URL
 
@@ -499,7 +556,7 @@ Rule:
 - sau recall, message bị đổi nội dung thành `This message was recalled`
 - attachment bị xóa khỏi payload message
 
-## 4.6. REST error format
+## 4.7. REST error format
 
 Ví dụ lỗi:
 
@@ -787,11 +844,12 @@ Nguyên nhân là payload hiện chưa ổn định tuyệt đối giữa các l
 
 1. WebSocket auth nằm ở STOMP `CONNECT` header, không phải query param.
 2. Gateway route `/ws/chat/**` là public ở lớp HTTP, nhưng chat-service vẫn bắt JWT trong frame `CONNECT`.
-3. REST hiện không trả unread count trong `ConversationResponse`.
+3. REST hiện không trả `unreadCount` trong `ConversationResponse` (`GET /api/chat/conversations`). Muốn lấy unread per member phải gọi `GET /api/chat/conversations/{conversationId}/members`.
 4. `clientMessageId` đã có trong request nhưng backend chưa dùng để chống duplicate optimistic send.
 5. Recall message chỉ hợp lệ trong 15 phút từ lúc tạo message.
-6. Presence hiện là in-memory với TTL khoảng 3 phút, chưa phải distributed presence.
-7. Typing state cũng là in-memory và chỉ mang tính tạm thời.
+6. Presence hiện là in-memory với TTL **3 phút** (online), chưa phải distributed presence.
+7. Typing state là in-memory TTL **10 giây** per user per conversation, chỉ mang tính tạm thời.
+8. Group conversation (`type: GROUP`) chưa được expose qua REST tạo mới; hiện chỉ hỗ trợ `DIRECT` qua `/api/chat/conversations/direct/{targetUserId}`.
 
 ---
 
@@ -804,6 +862,7 @@ Nếu chỉ lấy phần tối thiểu để frontend tích hợp nhanh, dùng b
 - `POST /api/chat/conversations/direct/{targetUserId}`
 - `GET /api/chat/conversations`
 - `GET /api/chat/conversations/{conversationId}/messages?cursor=&limit=`
+- `GET /api/chat/conversations/{conversationId}/members`
 - `PUT /api/chat/conversations/{conversationId}/read`
 - `PUT /api/chat/messages/{messageId}/recall`
 

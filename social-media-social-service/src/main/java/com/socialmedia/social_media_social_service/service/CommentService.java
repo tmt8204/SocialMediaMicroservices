@@ -14,6 +14,7 @@ import com.socialmedia.social_media_social_service.dto.CommentDTO.CommentUpdateR
 import com.socialmedia.social_media_social_service.dto.ProfileDTO.UserProfileSummary;
 import com.socialmedia.social_media_social_service.entities.CommentEntity;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
+import com.socialmedia.social_media_social_service.entities.enums.PostContextType;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
 import com.socialmedia.social_media_social_service.helpers.CommentHelper;
 import com.socialmedia.social_media_social_service.repositories.CommentRepository;
@@ -31,15 +32,11 @@ public class CommentService {
     private final CommentHelper commentHelper;
     private final UserProfileClient userProfileClient;
     private final SocialNotificationEventProducer notificationEventProducer;
+    private final CommunityService communityService;
 
     //---------------- COMMENT OPERATIONS ----------------
-    public List<CommentResponse> getCommentsByPostId(Long postId) {
-        PostEntity post = postRepository.findById(postId)
-                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
-
-        if (post.isDeleted()) {
-            throw new IllegalStateException("Post was banned");
-        }
+    public List<CommentResponse> getCommentsByPostId(String userId, Long postId) {
+        PostEntity post = getAccessiblePost(userId, postId);
 
         List<CommentResponse> responses = commentRepository.findByPostIdAndIsDeletedFalseOrderByCreatedAtAsc(postId)
                 .stream()
@@ -64,13 +61,7 @@ public class CommentService {
         }
         
         // Check post exists
-        PostEntity post = postRepository.findById(postId)
-                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
-        
-        // Check post is not deleted
-        if (post.isDeleted()) {
-            throw new IllegalStateException("Post was banned");
-        }
+        PostEntity post = getAccessiblePost(userId, postId);
         
         // Create new comment entity
         CommentEntity comment = new CommentEntity();
@@ -105,6 +96,8 @@ public class CommentService {
         if (comment.isDeleted()) {
             throw new IllegalStateException("Comment was deleted");
         }
+
+        ensureCommentPostAccessible(userId, comment);
         
         // Update content
         comment.setContent(request.getContent().trim());
@@ -124,6 +117,7 @@ public class CommentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId + " for user: " + userId));
 
         PostEntity post = comment.getPost();
+    ensureCommentPostAccessible(userId, comment);
         
         // Delete from database
         commentRepository.delete(comment);
@@ -152,6 +146,24 @@ public class CommentService {
         response.setUsername(profile.getUsername());
         response.setFullName(profile.getFullName());
         response.setAvatarUrl(profile.getAvatarUrl());
+    }
+
+    private PostEntity getAccessiblePost(String userId, Long postId) {
+        PostEntity post = postRepository.findByIdAndIsDeletedFalse(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
+
+        if (post.getPostContext() == PostContextType.COMMUNITY) {
+            communityService.requireReadableCommunity(userId, post.getCommunityId());
+        }
+
+        return post;
+    }
+
+    private void ensureCommentPostAccessible(String userId, CommentEntity comment) {
+        PostEntity post = comment.getPost();
+        if (post != null && post.getPostContext() == PostContextType.COMMUNITY) {
+            communityService.requireReadableCommunity(userId, post.getCommunityId());
+        }
     }
     
 }

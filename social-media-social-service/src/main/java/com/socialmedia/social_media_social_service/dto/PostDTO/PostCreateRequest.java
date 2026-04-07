@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,10 +13,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PostCreateRequest {
 
-    @NotBlank(message = "Content is required")
     private String content;
 
-    @NotBlank(message = "Visibility is required")
+    @jakarta.validation.constraints.NotBlank(message = "Visibility is required")
     private String visibility;
 
     @Valid
