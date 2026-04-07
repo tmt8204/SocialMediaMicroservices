@@ -31,7 +31,10 @@ public interface StoryRepository extends JpaRepository<StoryEntity, Long> {
           AND s.expiresAt > :now
           AND (
                 s.userId = :viewerId
-             OR s.userId IN :friendIds
+                         OR (
+                                        s.userId IN :friendIds
+                                AND (s.visibility = 'FRIEND' OR s.visibility = 'PUBLIC')
+                         )
           )
         ORDER BY s.createdAt DESC
     """)

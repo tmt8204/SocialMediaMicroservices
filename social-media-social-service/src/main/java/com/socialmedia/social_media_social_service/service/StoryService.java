@@ -154,8 +154,8 @@ public class StoryService {
         }
     }
 
-            @Transactional(readOnly = true)
-            public Page<StoryViewResponse> getStoryViewers(String ownerId, Long storyId, Pageable pageable) {
+    @Transactional(readOnly = true)
+    public Page<StoryViewResponse> getStoryViewers(String ownerId, Long storyId, Pageable pageable) {
             StoryEntity story = storyRepository.findByIdAndUserId(storyId, ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Story not found with id: " + storyId));
 
@@ -172,7 +172,7 @@ public class StoryService {
                 .toList();
 
             return new PageImpl<>(responses, pageable, viewerPage.getTotalElements());
-            }
+        }
 
     public void deleteStory(String userId, Long storyId) {
         StoryEntity story = storyRepository.findByIdAndUserId(storyId, userId)
@@ -225,7 +225,11 @@ public class StoryService {
         if (feedCandidates.isEmpty()) {
             return ownStories;
         }
-        return feedCandidates;
+        return feedCandidates.stream()
+                .filter(story -> userId.equals(story.getUserId())
+                        || "PUBLIC".equalsIgnoreCase(story.getVisibility())
+                        || "FRIEND".equalsIgnoreCase(story.getVisibility()))
+                .toList();
     }
 
     private List<StoryFeedGroupResponse> buildFeedGroups(String viewerId, List<StoryEntity> stories) {
