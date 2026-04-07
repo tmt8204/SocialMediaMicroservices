@@ -39,18 +39,20 @@ public class MediaController {
     public ResponseEntity<UploadMediaResponse> uploadMedia(
             @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
             @RequestParam(value = "userId", required = false) String requestUserId,
+            @RequestParam(value = "resourceType", required = false, defaultValue = "post") String resourceType,
             @RequestParam("files") List<MultipartFile> files) {
         String userId = StringUtils.hasText(headerUserId) ? headerUserId : requestUserId;
-        UploadMediaResponse response = cloudinaryMediaService.uploadMedia(files, userId);
+        UploadMediaResponse response = cloudinaryMediaService.uploadMedia(files, userId, resourceType);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/my-uploads")
     public ResponseEntity<UploadMediaResponse> getMyUploadedPostMedia(
             @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-            @RequestParam(value = "userId", required = false) String requestUserId) {
+            @RequestParam(value = "userId", required = false) String requestUserId,
+            @RequestParam(value = "resourceType", required = false, defaultValue = "post") String resourceType) {
         String userId = StringUtils.hasText(headerUserId) ? headerUserId : requestUserId;
-        return ResponseEntity.ok(cloudinaryMediaService.getUploadedPostMedia(userId));
+        return ResponseEntity.ok(cloudinaryMediaService.getUploadedMedia(userId, resourceType));
     }
 
     @DeleteMapping({"/{*publicId}", ""})

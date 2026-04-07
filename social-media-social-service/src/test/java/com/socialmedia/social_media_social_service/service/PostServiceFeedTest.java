@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.enums.PostContextType;
 import com.socialmedia.social_media_social_service.helpers.PostHelper;
+import com.socialmedia.social_media_social_service.repositories.CommentRepository;
 import com.socialmedia.social_media_social_service.repositories.FriendRepository;
 import com.socialmedia.social_media_social_service.repositories.PostRepository;
 import com.socialmedia.social_media_social_service.repositories.ReactionsRepository;
@@ -35,6 +36,9 @@ class PostServiceFeedTest {
 
     @Mock
     private MediaServiceClient mediaServiceClient;
+
+    @Mock
+    private CommentRepository commentRepository;
 
     @Mock
     private ReactionsRepository reactionsRepository;
@@ -57,6 +61,7 @@ class PostServiceFeedTest {
                 friendRepository,
                 new PostHelper(),
                 mediaServiceClient,
+                commentRepository,
                 reactionsRepository,
                 userProfileClient,
                 notificationEventProducer,

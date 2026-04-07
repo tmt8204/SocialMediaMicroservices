@@ -53,9 +53,10 @@ public class CloudinaryMediaService {
     @Value("${app.media.max-video-size-bytes:52428800}")
     private long maxVideoSizeBytes;
 
-    public UploadMediaResponse getUploadedPostMedia(String userId) {
+    public UploadMediaResponse getUploadedMedia(String userId, String resourceType) {
         String normalizedUserId = normalizeUserId(userId);
-        String folderPrefix = "social-media/posts/" + normalizedUserId;
+        MediaResourceType mediaResourceType = MediaResourceType.from(resourceType);
+        String folderPrefix = mediaResourceType.folderForUser(normalizedUserId);
 
         List<UploadMediaResponse.MediaItem> items = new ArrayList<>();
         String nextCursor = null;
@@ -91,10 +92,11 @@ public class CloudinaryMediaService {
                 .build();
     }
 
-    public UploadMediaResponse uploadMedia(List<MultipartFile> files, String userId) {
+    public UploadMediaResponse uploadMedia(List<MultipartFile> files, String userId, String resourceType) {
         validateFiles(files);
         String normalizedUserId = normalizeUserId(userId);
-        String folder = "social-media/posts/" + normalizedUserId;
+        MediaResourceType mediaResourceType = MediaResourceType.from(resourceType);
+        String folder = mediaResourceType.folderForUser(normalizedUserId);
 
         List<UploadMediaResponse.MediaItem> uploadedItems = new ArrayList<>();
         for (MultipartFile file : files) {
@@ -102,7 +104,7 @@ public class CloudinaryMediaService {
             Map<String, Object> options = new HashMap<>();
             options.put("folder", folder);
             options.put("resource_type", mediaType.getCloudinaryResourceType());
-            options.put("tags", String.join(",", List.of("post", "social-service", normalizedUserId)));
+            options.put("tags", String.join(",", List.of(mediaResourceType.tag(), "social-service", normalizedUserId)));
             options.put("unique_filename", true);
             options.put("overwrite", false);
 

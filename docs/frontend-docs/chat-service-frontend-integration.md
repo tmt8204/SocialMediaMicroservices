@@ -13,7 +13,9 @@
 Chat service hiện hỗ trợ:
 
 - tạo hoặc lấy direct conversation 1-1
+- tạo group conversation
 - lấy danh sách conversation
+- quản lý member và role trong group conversation
 - lấy lịch sử tin nhắn theo cursor
 - gửi tin nhắn realtime qua STOMP
 - mark as read
@@ -492,9 +494,117 @@ Field:
 
 Lưu ý: đây là nội bộ conversation, hiện chưa expose `unreadCount` trong `ConversationResponse` từ `GET /api/chat/conversations`. Nếu cần badge unread trên màn danh sách, frontend có thể gọi endpoint này hoặc track local từ realtime event.
 
+## 4.5. Tao va quan ly group conversation
+
+### Tao group conversation
+
+- `POST /api/chat/conversations/group`
+
+Body:
+
+```json
+{
+  "groupName": "Team Backend",
+  "groupAvatarUrl": "https://cdn.example.com/groups/backend.png",
+  "groupDescription": "Noi trao doi cong viec backend",
+  "memberUserIds": ["userB", "userC"]
+}
+```
+
+Response co them metadata group trong `ConversationResponse`:
+
+```json
+{
+  "conversationId": "67ef2b4d9ab123456789abcd",
+  "type": "GROUP",
+  "groupName": "Team Backend",
+  "groupAvatarUrl": "https://cdn.example.com/groups/backend.png",
+  "groupDescription": "Noi trao doi cong viec backend",
+  "participantIds": ["userA", "userB", "userC"],
+  "lastMessageId": null,
+  "lastMessagePreview": null,
+  "lastMessageSenderId": null,
+  "lastMessageAt": null,
+  "createdAt": "2026-04-07T10:00:00Z"
+}
+```
+
+Rule:
+
+- `groupName` bat buoc
+- `memberUserIds` phai co it nhat 1 user khac creator
+- creator tu dong la `OWNER`
+
+### Them member vao group
+
+- `POST /api/chat/conversations/{conversationId}/members`
+
+Body:
+
+```json
+{
+  "memberUserIds": ["userD", "userE"]
+}
+```
+
+Chi `OWNER` hoac `ADMIN` moi them duoc member.
+
+### Cap nhat metadata group
+
+- `PUT /api/chat/conversations/{conversationId}`
+
+Body:
+
+```json
+{
+  "groupName": "Team Backend Platform",
+  "groupAvatarUrl": "https://cdn.example.com/groups/backend-platform.png",
+  "groupDescription": "Trao doi ve backend va platform"
+}
+```
+
+Chi `OWNER` hoac `ADMIN` moi cap nhat duoc metadata group.
+
+### Doi role member
+
+- `PUT /api/chat/conversations/{conversationId}/members/{memberUserId}/role`
+
+Body:
+
+```json
+{
+  "role": "ADMIN"
+}
+```
+
+Rule:
+
+- chi `OWNER` moi doi duoc role
+- neu set `role = OWNER`, ownership duoc transfer sang member do va owner cu tro thanh `ADMIN`
+
+### Xoa member khoi group
+
+- `DELETE /api/chat/conversations/{conversationId}/members/{memberUserId}`
+
+Rule:
+
+- `OWNER` va `ADMIN` deu co the xoa `MEMBER`
+- `ADMIN` khong duoc xoa `ADMIN` khac
+- khong duoc xoa `OWNER`
+
+### Roi group
+
+- `POST /api/chat/conversations/{conversationId}/leave`
+
+Rule:
+
+- member thuong va admin co the roi group truc tiep
+- `OWNER` phai transfer ownership truoc khi roi neu group con nguoi khac
+
+
 ---
 
-## 4.5. Mark as read
+## 4.6. Mark as read
 
 ### Method + URL
 
@@ -523,7 +633,7 @@ Rule:
 - đánh dấu các message từ người khác là `SEEN` tới boundary tương ứng
 - publish read event ra Kafka
 
-## 4.6. Recall message
+## 4.7. Recall message
 
 ### Method + URL
 
@@ -556,7 +666,7 @@ Rule:
 - sau recall, message bị đổi nội dung thành `This message was recalled`
 - attachment bị xóa khỏi payload message
 
-## 4.7. REST error format
+## 4.8. REST error format
 
 Ví dụ lỗi:
 
@@ -849,7 +959,7 @@ Nguyên nhân là payload hiện chưa ổn định tuyệt đối giữa các l
 5. Recall message chỉ hợp lệ trong 15 phút từ lúc tạo message.
 6. Presence hiện là in-memory với TTL **3 phút** (online), chưa phải distributed presence.
 7. Typing state là in-memory TTL **10 giây** per user per conversation, chỉ mang tính tạm thời.
-8. Group conversation (`type: GROUP`) chưa được expose qua REST tạo mới; hiện chỉ hỗ trợ `DIRECT` qua `/api/chat/conversations/direct/{targetUserId}`.
+8. `ConversationResponse` hien chua tra `unreadCount`, nen badge unread van can lay qua endpoint members hoac tu realtime state.
 
 ---
 
@@ -860,9 +970,15 @@ Nếu chỉ lấy phần tối thiểu để frontend tích hợp nhanh, dùng b
 ### REST
 
 - `POST /api/chat/conversations/direct/{targetUserId}`
+- `POST /api/chat/conversations/group`
 - `GET /api/chat/conversations`
 - `GET /api/chat/conversations/{conversationId}/messages?cursor=&limit=`
 - `GET /api/chat/conversations/{conversationId}/members`
+- `POST /api/chat/conversations/{conversationId}/members`
+- `PUT /api/chat/conversations/{conversationId}`
+- `PUT /api/chat/conversations/{conversationId}/members/{memberUserId}/role`
+- `DELETE /api/chat/conversations/{conversationId}/members/{memberUserId}`
+- `POST /api/chat/conversations/{conversationId}/leave`
 - `PUT /api/chat/conversations/{conversationId}/read`
 - `PUT /api/chat/messages/{messageId}/recall`
 

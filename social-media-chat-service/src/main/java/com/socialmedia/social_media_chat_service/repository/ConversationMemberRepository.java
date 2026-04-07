@@ -22,5 +22,7 @@ public interface ConversationMemberRepository extends MongoRepository<Conversati
 
     List<ConversationMemberDocument> findByConversationIdAndActiveTrue(String conversationId);
 
+    List<ConversationMemberDocument> findByConversationIdAndUserIdIn(String conversationId, List<String> userIds);
+
     int countByConversationIdAndUnreadCountGreaterThan(String conversationId, int count);
 }

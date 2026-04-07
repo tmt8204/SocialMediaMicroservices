@@ -25,6 +25,7 @@ import com.socialmedia.social_media_social_service.entities.PostMedia;
 import com.socialmedia.social_media_social_service.entities.enums.PostContextType;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
 import com.socialmedia.social_media_social_service.helpers.PostHelper;
+import com.socialmedia.social_media_social_service.repositories.CommentRepository;
 import com.socialmedia.social_media_social_service.repositories.FriendRepository;
 import com.socialmedia.social_media_social_service.repositories.PostRepository;
 import com.socialmedia.social_media_social_service.repositories.ReactionsRepository;
@@ -40,6 +41,7 @@ public class PostService {
     private final FriendRepository friendRepository;
     private final PostHelper postHelper;
     private final MediaServiceClient mediaServiceClient;
+    private final CommentRepository commentRepository;
     private final ReactionsRepository reactionsRepository;
     private final UserProfileClient userProfileClient;
     private final SocialNotificationEventProducer notificationEventProducer;
@@ -145,6 +147,9 @@ public class PostService {
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId + " for user: " + userId));
 
         List<String> publicIdsToDelete = extractPublicIds(post.getMedia());
+
+        commentRepository.deleteByPostId(postId);
+        reactionsRepository.deleteByPostId(postId);
         postRepository.delete(post);
         mediaServiceClient.deleteMediaByPublicIds(publicIdsToDelete);
     }

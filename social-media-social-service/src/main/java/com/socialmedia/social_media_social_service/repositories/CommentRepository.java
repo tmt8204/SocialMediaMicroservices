@@ -10,4 +10,5 @@ import com.socialmedia.social_media_social_service.entities.CommentEntity;
 public interface CommentRepository extends JpaRepository<CommentEntity, Long> {
     List<CommentEntity> findByPostIdAndIsDeletedFalseOrderByCreatedAtAsc(Long postId);
     Optional<CommentEntity> findByIdAndUserId(Long id, String userId);
+    void deleteByPostId(Long postId);
 }

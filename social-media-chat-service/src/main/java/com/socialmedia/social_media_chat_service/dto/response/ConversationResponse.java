@@ -15,6 +15,9 @@ import java.util.List;
 public class ConversationResponse {
     private String conversationId;
     private ConversationType type;
+    private String groupName;
+    private String groupAvatarUrl;
+    private String groupDescription;
     private List<String> participantIds;
     private String lastMessageId;
     private String lastMessagePreview;

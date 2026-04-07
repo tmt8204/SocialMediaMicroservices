@@ -38,6 +38,12 @@ public class ConversationDocument {
 
     private String createdBy;
 
+    private String groupName;
+
+    private String groupAvatarUrl;
+
+    private String groupDescription;
+
     @Indexed
     private List<String> participantIds;
 

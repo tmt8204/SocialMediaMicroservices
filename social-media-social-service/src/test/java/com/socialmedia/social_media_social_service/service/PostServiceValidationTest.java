@@ -3,6 +3,7 @@ package com.socialmedia.social_media_social_service.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,6 +25,7 @@ import com.socialmedia.social_media_social_service.dto.PostDTO.PostUpdateRequest
 import com.socialmedia.social_media_social_service.dto.ProfileDTO.UserProfileSummary;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.helpers.PostHelper;
+import com.socialmedia.social_media_social_service.repositories.CommentRepository;
 import com.socialmedia.social_media_social_service.repositories.FriendRepository;
 import com.socialmedia.social_media_social_service.repositories.PostRepository;
 import com.socialmedia.social_media_social_service.repositories.ReactionsRepository;
@@ -39,6 +41,9 @@ class PostServiceValidationTest {
 
     @Mock
     private MediaServiceClient mediaServiceClient;
+
+    @Mock
+    private CommentRepository commentRepository;
 
     @Mock
     private ReactionsRepository reactionsRepository;
@@ -61,6 +66,7 @@ class PostServiceValidationTest {
                 friendRepository,
                 new PostHelper(),
                 mediaServiceClient,
+                commentRepository,
                 reactionsRepository,
                 userProfileClient,
                 notificationEventProducer,
@@ -138,5 +144,23 @@ class PostServiceValidationTest {
         assertThat(existing.getContent()).isEqualTo("updated text");
         assertThat(existing.getMood()).isEqualTo("focused");
         assertThat(existing.getLocation()).isEqualTo("Da Nang");
+    }
+
+    @Test
+    void deletePostPermanently_removesDependentsBeforeDeletingPost() {
+        PostEntity existing = new PostEntity();
+        existing.setId(99L);
+        existing.setUserId("userA");
+        existing.setMedia(new ArrayList<>());
+
+        when(postRepository.findByIdAndUserId(99L, "userA")).thenReturn(Optional.of(existing));
+
+        postService.deletePostPermanently("userA", 99L);
+
+        var inOrder = inOrder(commentRepository, reactionsRepository, postRepository, mediaServiceClient);
+        inOrder.verify(commentRepository).deleteByPostId(99L);
+        inOrder.verify(reactionsRepository).deleteByPostId(99L);
+        inOrder.verify(postRepository).delete(existing);
+        inOrder.verify(mediaServiceClient).deleteMediaByPublicIds(List.of());
     }
 }
