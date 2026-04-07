@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.socialmedia.auth.dto.AuthResponse;
 import com.socialmedia.auth.dto.ChangePasswordRequest;
 import com.socialmedia.auth.dto.ForgotPasswordRequest;
+import com.socialmedia.auth.dto.GoogleLoginRequest;
 import com.socialmedia.auth.dto.IssuedAuthTokens;
 import com.socialmedia.auth.dto.LoginRequest;
 import com.socialmedia.auth.dto.RefreshTokenRequest;
@@ -49,6 +50,14 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         IssuedAuthTokens tokens = userService.loginUser(loginRequest);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookieService.buildRefreshTokenCookie(tokens.getRefreshToken()).toString())
+                .body(tokens.getAuthResponse());
+    }
+
+    @PostMapping("/google-login")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest googleLoginRequest) {
+        IssuedAuthTokens tokens = userService.loginWithGoogle(googleLoginRequest.getIdToken());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookieService.buildRefreshTokenCookie(tokens.getRefreshToken()).toString())
                 .body(tokens.getAuthResponse());

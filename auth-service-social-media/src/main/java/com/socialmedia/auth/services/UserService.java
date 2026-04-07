@@ -2,14 +2,17 @@ package com.socialmedia.auth.services;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.StringUtils;
 import com.socialmedia.auth.dto.AuthResponse;
 import com.socialmedia.auth.dto.ChangePasswordRequest;
 import com.socialmedia.auth.dto.CreateProfileEvent;
 import com.socialmedia.auth.dto.ForgotPasswordRequest;
+import com.socialmedia.auth.dto.GoogleUserProfile;
 import com.socialmedia.auth.dto.IssuedAuthTokens;
 import com.socialmedia.auth.dto.LoginRequest;
 import com.socialmedia.auth.dto.RegisterRequest;
@@ -48,6 +51,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final GoogleIdTokenVerifierService googleIdTokenVerifierService;
     private final UserTokenRepository userTokenRepository;
     private final EmailService emailService;
     private final KafkaEventProducer kafkaEventProducer;
@@ -59,12 +63,14 @@ public class UserService {
     private String frontendUrl;
 
     public UserService(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder,
-            JwtService jwtService, UserTokenRepository userTokenRepository, EmailService emailService,
+            JwtService jwtService, GoogleIdTokenVerifierService googleIdTokenVerifierService,
+            UserTokenRepository userTokenRepository, EmailService emailService,
             KafkaEventProducer kafkaEventProducer) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.googleIdTokenVerifierService = googleIdTokenVerifierService;
         this.userTokenRepository = userTokenRepository;
         this.emailService = emailService;
         this.kafkaEventProducer = kafkaEventProducer;
@@ -177,6 +183,30 @@ public class UserService {
         return issueTokens(user);
     }
 
+    public IssuedAuthTokens loginWithGoogle(String idToken) {
+        GoogleUserProfile googleUserProfile = googleIdTokenVerifierService.verify(idToken);
+        Instant now = Instant.now();
+
+        User user = userRepository.findByEmail(googleUserProfile.email())
+                .orElseGet(() -> createGoogleUser(googleUserProfile));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new UnauthorizedException("Account is deactivated. Please contact support.");
+        }
+
+        user.setEmailVerified(true);
+        user.setLoginFailedCount(0);
+        user.setLockedUntil(null);
+        user.setLastLoginAt(now);
+        if (!StringUtils.hasText(user.getFullName()) && StringUtils.hasText(googleUserProfile.fullName())) {
+            user.setFullName(googleUserProfile.fullName());
+        }
+        userRepository.save(user);
+
+        userTokenRepository.deleteByUserId(user.getId());
+        return issueTokens(user);
+    }
+
     
 
     // -------------------- User Logout ------------------- //
@@ -267,6 +297,50 @@ public class UserService {
                 user.getFullName(),
                 roleName),
             refreshToken);
+    }
+
+    private User createGoogleUser(GoogleUserProfile googleUserProfile) {
+        User user = new User();
+        user.setUsername(generateUniqueGoogleUsername(googleUserProfile.email()));
+        user.setEmail(googleUserProfile.email());
+        user.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+        user.setFullName(googleUserProfile.fullName());
+        user.setEmailVerified(true);
+        user.setRole(loadDefaultRole());
+
+        userRepository.save(user);
+
+        try {
+            publishUserCreatedEvent(user);
+        } catch (Exception ex) {
+            System.err.println("Failed to publish CreateProfileEvent for Google user: " + user.getUsername() + ". Error: " + ex.getMessage());
+        }
+
+        return user;
+    }
+
+    private Role loadDefaultRole() {
+        return roleRepository.findByRoleName(DEFAULT_ROLE)
+                .orElseThrow(() -> new BadRequestException("Role not found: " + DEFAULT_ROLE));
+    }
+
+    private String generateUniqueGoogleUsername(String email) {
+        String localPart = email.substring(0, email.indexOf('@')).toLowerCase(Locale.ROOT);
+        String base = localPart.replaceAll("[^a-z0-9._]", "");
+        if (!StringUtils.hasText(base)) {
+            base = "googleuser";
+        }
+        if (base.length() < 6) {
+            base = (base + "googleuser").substring(0, 6);
+        }
+
+        String candidate = base;
+        int suffix = 1;
+        while (userRepository.existsByUsername(candidate)) {
+            candidate = base + suffix;
+            suffix++;
+        }
+        return candidate;
     }
 
     private String extractUserIdForLogout(String accessToken, String refreshToken) {
