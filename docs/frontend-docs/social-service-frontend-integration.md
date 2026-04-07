@@ -139,6 +139,8 @@ Body:
 {
   "content": "Hello social media",
   "visibility": "PUBLIC",
+  "mood": "happy",
+  "location": "Ha Noi",
   "media": [
     {
       "publicId": "social-media/posts/user123/abc123",
@@ -156,9 +158,13 @@ Body:
 
 ### Rule thực tế
 
-- `content`: bắt buộc
 - `visibility`: bắt buộc
+- post hợp lệ nếu có ít nhất một trong 2: `content` hoặc media
+- `content` có thể để trống nếu có ảnh/video
+- nếu `content` chỉ là khoảng trắng, backend sẽ chuẩn hóa thành `null`
 - `visibility` chỉ nhận `PUBLIC`, `FRIEND`, `PRIVATE`
+- `mood`: optional, tối đa 255 ký tự
+- `location`: optional, tối đa 500 ký tự
 - `media` là metadata sau khi upload qua media-service
 - `mediaUrls` là field legacy, vẫn được backend support
 - nếu `mediaType` để trống, backend sẽ tự suy luận từ `mediaUrl`
@@ -176,6 +182,11 @@ Body:
   "avatarUrl": "https://cdn.example.com/avatar-a.jpg",
   "content": "Hello social media",
   "visibility": "PUBLIC",
+  "mood": "happy",
+  "location": "Ha Noi",
+  "postContext": "PROFILE",
+  "communityId": null,
+  "communityName": null,
   "media": [
     {
       "publicId": "social-media/posts/user123/abc123",
@@ -204,6 +215,11 @@ Các API trả `PostResponse` hiện có thêm:
 - `fullName`
 - `avatarUrl`
 - `commentCount`
+- `mood`
+- `location`
+- `postContext`: `PROFILE` | `COMMUNITY`
+- `communityId`: có giá trị nếu là community post
+- `communityName`: có giá trị nếu là community post
 
 ## 4.2. Update post
 
@@ -216,7 +232,33 @@ Body giống `create post`.
 Behavior quan trọng:
 
 - chỉ owner được update
+- backend replace toàn bộ media list của post theo payload mới
 - nếu media cũ bị remove khỏi payload mới, backend sẽ gọi media-service để xóa asset theo `publicId`
+- nếu muốn giữ lại ảnh/video cũ, frontend phải gửi lại chúng trong request update
+- backend hỗ trợ thay 1 ảnh bằng ảnh khác, nhưng theo kiểu gửi lại trạng thái media cuối cùng mong muốn
+
+Ví dụ update đổi ảnh và cập nhật mood/location:
+
+```json
+{
+  "content": "Da sua bai viet",
+  "visibility": "PUBLIC",
+  "mood": "focused",
+  "location": "Da Nang",
+  "media": [
+    {
+      "publicId": "social-media/posts/user123/new-image-1",
+      "mediaUrl": "https://res.cloudinary.com/demo/image/upload/v1/new-image.jpg",
+      "mediaType": "IMAGE",
+      "provider": "CLOUDINARY",
+      "width": 1080,
+      "height": 1080,
+      "bytes": 298765
+    }
+  ],
+  "mediaUrls": []
+}
+```
 
 ## 4.3. Get post by id
 
@@ -224,14 +266,14 @@ Behavior quan trọng:
 
 - `GET /api/social/posts/{postId}`
 
-### Lưu ý rất quan trọng
+### Rule thực tế
 
-Theo code hiện tại, API này đang dùng query `findByIdAndUserIdAndIsDeletedFalse`, tức là:
+- owner luôn xem được post của mình nếu chưa bị delete
+- post `PUBLIC` của người khác xem được
+- post `FRIEND` xem được nếu current user là accepted friend
+- community post xem được theo rule privacy của community
 
-- chỉ owner mới lấy được post này
-- không dùng để mở post public hoặc post của người khác
-
-Frontend không nên giả định đây là API chi tiết post public.
+Frontend có thể dùng API này như API chi tiết post, không còn bị giới hạn owner-only như trước.
 
 ## 4.4. Lấy post của tôi
 
@@ -252,6 +294,11 @@ Response là `Spring Page<PostResponse>`:
       "avatarUrl": "https://cdn.example.com/avatar-a.jpg",
       "content": "Hello social media",
       "visibility": "PUBLIC",
+      "mood": "happy",
+      "location": "Ha Noi",
+      "postContext": "PROFILE",
+      "communityId": null,
+      "communityName": null,
       "media": [],
       "mediaUrls": [],
       "totalReacts": 0,
@@ -289,6 +336,7 @@ Feed lấy:
 - toàn bộ post không bị delete của current user
 - post `PUBLIC` của người khác
 - post `FRIEND` và `PUBLIC` của accepted friends
+- post từ các community mà current user đang `APPROVED`
 - không trả post đã bị hide/delete
 
 Nếu user không có friend accepted nào, feed chỉ trả post `PUBLIC` của người khác.
@@ -297,6 +345,11 @@ Nếu user không có friend accepted nào, feed vẫn trả:
 
 - post của chính current user
 - post `PUBLIC` của người khác
+
+Nếu user đã tham gia community, feed còn có thể trả:
+
+- post có `postContext = COMMUNITY`
+- kèm `communityId` và `communityName` để frontend render card cộng đồng
 
 ## 4.6. Hide / Unhide / Delete post
 
@@ -806,6 +859,8 @@ Response:
 {
   "content": "Hello social media",
   "visibility": "PUBLIC",
+  "mood": "happy",
+  "location": "Ha Noi",
   "media": [
     {
       "publicId": "social-media/posts/user123/abc123",
@@ -827,8 +882,16 @@ Response:
 {
   "id": 101,
   "userId": "userA",
+  "username": "nguyenvana",
+  "fullName": "Nguyen Van A",
+  "avatarUrl": "https://cdn.example.com/avatar-a.jpg",
   "content": "Hello social media",
   "visibility": "PUBLIC",
+  "mood": "happy",
+  "location": "Ha Noi",
+  "postContext": "PROFILE",
+  "communityId": null,
+  "communityName": null,
   "media": [
     {
       "publicId": "social-media/posts/user123/abc123",
@@ -844,6 +907,7 @@ Response:
     "https://res.cloudinary.com/demo/image/upload/v1/post.jpg"
   ],
   "totalReacts": 0,
+  "commentCount": 0,
   "reactedByCurrentUser": false,
   "createdAt": "2026-04-06T10:00:00.000+00:00",
   "updatedAt": "2026-04-06T10:00:00.000+00:00"
@@ -923,6 +987,11 @@ Response:
 3. Gọi `POST /api/social/posts/create` với `content`, `visibility`, `media`.
 4. Update UI bằng `PostResponse` trả về.
 
+Lưu ý:
+
+- có thể tạo post chỉ với media, không bắt buộc `content`
+- nếu gửi cả `mood` và `location`, backend sẽ lưu và trả lại trong `PostResponse`
+
 Ví dụ:
 
 ```js
@@ -937,13 +1006,48 @@ const response = await fetch('http://localhost:8080/api/social/posts/create', {
   body: JSON.stringify({
     content: 'Hello social media',
     visibility: 'PUBLIC',
+    mood: 'happy',
+    location: 'Ha Noi',
     media: mediaItems,
     mediaUrls: []
   })
 });
 ```
 
-## 9.2. Flow load feed
+## 9.2. Flow update post và thay ảnh
+
+1. Nếu user chọn ảnh/video mới, upload file mới sang media-service trước.
+2. Giữ lại danh sách media cũ mà user vẫn muốn hiển thị.
+3. Ghép danh sách media cuối cùng mong muốn.
+4. Gọi `PUT /api/social/posts/update/{postId}` với toàn bộ danh sách media cuối cùng.
+
+Rule rất quan trọng:
+
+- backend không patch từng ảnh riêng lẻ
+- backend replace toàn bộ media list của post
+- ảnh/video nào không còn xuất hiện trong payload update sẽ bị coi là đã xóa
+
+Ví dụ:
+
+```js
+await fetch(`http://localhost:8080/api/social/posts/update/${postId}`, {
+  method: 'PUT',
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    content: '',
+    visibility: 'PUBLIC',
+    mood: 'focused',
+    location: 'Da Nang',
+    media: finalMediaItems,
+    mediaUrls: []
+  })
+});
+```
+
+## 9.3. Flow load feed
 
 1. Gọi `GET /api/social/feed?page=0&size=10`
 2. Render `content` của Spring Page
@@ -951,10 +1055,10 @@ const response = await fetch('http://localhost:8080/api/social/posts/create', {
 
 Lưu ý:
 
-- feed hiện không trả user profile đầy đủ
-- nếu UI cần avatar/fullName/username, frontend nên join thêm từ user-service
+- feed hiện đã trả `username`, `fullName`, `avatarUrl`
+- nếu item có `postContext = COMMUNITY`, frontend nên dùng thêm `communityName` để render nguồn bài viết
 
-## 9.3. Flow reaction
+## 9.4. Flow reaction
 
 Khuyến nghị optimistic UI:
 
@@ -965,7 +1069,7 @@ Khuyến nghị optimistic UI:
 
 Tương tự khi bỏ react với `DELETE /posts/{postId}/react`.
 
-## 9.4. Flow friend button
+## 9.5. Flow friend button
 
 Frontend nên dùng `GET /friends/relationship/{targetUserId}` để quyết định nút hiện ra:
 
@@ -974,14 +1078,15 @@ Frontend nên dùng `GET /friends/relationship/{targetUserId}` để quyết đ�
 - `PENDING_RECEIVED` -> hiện `Accept` và `Reject`
 - `FRIEND` -> hiện `Friends` hoặc `Unfriend`
 
-## 9.5. Những điểm FE cần biết trước
+## 9.6. Những điểm FE cần biết trước
 
-1. `GET /posts/{postId}` hiện không phải API xem post public, mà chỉ xem post của chính owner.
-2. Comment list hiện trả toàn bộ comment chưa xóa của post, chưa có pagination.
-3. Chưa có endpoint list profile detail trong friend list, chỉ có `otherUserId`.
+1. Post hiện hợp lệ nếu có ít nhất một trong `content` hoặc media.
+2. `GET /posts/{postId}` có thể dùng như API chi tiết post theo rule visibility hiện tại.
+3. Comment list hiện trả toàn bộ comment chưa xóa của post, chưa có pagination.
 4. Reaction chỉ áp dụng cho post, chưa có reaction cho comment.
-5. Feed hiện có bao gồm post của current user.
+5. Feed hiện có bao gồm post của current user và post community đã tham gia.
 6. Request kết bạn có thể auto-accept nếu phía bên kia đã gửi trước đó.
+7. Nếu FE update media của post, phải gửi lại toàn bộ media list cuối cùng mong muốn.
 
 ---
 

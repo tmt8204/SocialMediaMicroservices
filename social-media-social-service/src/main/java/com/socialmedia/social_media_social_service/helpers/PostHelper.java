@@ -40,6 +40,8 @@ public class PostHelper {
         }
         response.setContent(post.getContent());
         response.setVisibility(post.getVisibility());
+        response.setMood(post.getMood());
+        response.setLocation(post.getLocation());
         response.setPostContext(post.getPostContext() == null ? null : post.getPostContext().name());
         response.setCommunityId(post.getCommunityId());
         response.setTotalReacts(post.getReactionsCount());

@@ -22,7 +22,6 @@ import com.socialmedia.social_media_social_service.dto.PostDTO.PostUpdateRequest
 import com.socialmedia.social_media_social_service.dto.ProfileDTO.UserProfileSummary;
 import com.socialmedia.social_media_social_service.entities.PostEntity;
 import com.socialmedia.social_media_social_service.entities.PostMedia;
-import com.socialmedia.social_media_social_service.entities.enums.CommunityMemberStatus;
 import com.socialmedia.social_media_social_service.entities.enums.PostContextType;
 import com.socialmedia.social_media_social_service.exceptions.ResourceNotFoundException;
 import com.socialmedia.social_media_social_service.helpers.PostHelper;
@@ -53,6 +52,8 @@ public class PostService {
         PostEntity post = new PostEntity();
         post.setUserId(userId);
         post.setContent(normalizeContent(request.getContent()));
+        post.setMood(normalizeOptionalText(request.getMood(), 255));
+        post.setLocation(normalizeOptionalText(request.getLocation(), 500));
         post.setVisibility(postHelper.resolveVisibility(request.getVisibility()));
         post.setCommunityId(null);
         post.setPostContext(PostContextType.PROFILE);
@@ -77,6 +78,8 @@ public class PostService {
         List<String> removedPublicIds = extractRemovedPublicIds(post.getMedia(), request.getMedia(), request.getMediaUrls());
 
         post.setContent(normalizeContent(request.getContent()));
+        post.setMood(normalizeOptionalText(request.getMood(), 255));
+        post.setLocation(normalizeOptionalText(request.getLocation(), 500));
         post.setVisibility(postHelper.resolveVisibility(request.getVisibility()));
         post.setUpdatedAt(new Date());
 
@@ -104,6 +107,8 @@ public class PostService {
         PostEntity post = new PostEntity();
         post.setUserId(userId);
         post.setContent(normalizeContent(request.getContent()));
+        post.setMood(normalizeOptionalText(request.getMood(), 255));
+        post.setLocation(normalizeOptionalText(request.getLocation(), 500));
         post.setVisibility(postHelper.resolveVisibility(request.getVisibility()));
         post.setCommunityId(communityId);
         post.setPostContext(PostContextType.COMMUNITY);
@@ -302,6 +307,18 @@ public class PostService {
         }
 
         return content.trim();
+    }
+
+    private String normalizeOptionalText(String value, int maxLength) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+
+        String normalized = value.trim();
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException("Field must not exceed " + maxLength + " characters");
+        }
+        return normalized;
     }
 
     //----------------MEDIA OPERATIONS----------------

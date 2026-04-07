@@ -27,6 +27,10 @@ public class PostResponse {
 
     private String visibility;
 
+    private String mood;
+
+    private String location;
+
     private String postContext;
 
     private Long communityId;

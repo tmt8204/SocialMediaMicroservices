@@ -87,6 +87,8 @@ class PostServiceValidationTest {
         request.setVisibility("PUBLIC");
         request.setMedia(List.of(new PostMediaRequest("public-1", "https://cdn/image.jpg", "IMAGE", "CLOUDINARY", 100, 100, 200L)));
         request.setMediaUrls(List.of());
+        request.setMood("happy");
+        request.setLocation("Hanoi");
 
         PostEntity savedPost = new PostEntity();
         savedPost.setId(1L);
@@ -104,6 +106,8 @@ class PostServiceValidationTest {
         ArgumentCaptor<PostEntity> captor = ArgumentCaptor.forClass(PostEntity.class);
         verify(postRepository).save(captor.capture());
         assertThat(captor.getValue().getContent()).isNull();
+        assertThat(captor.getValue().getMood()).isEqualTo("happy");
+        assertThat(captor.getValue().getLocation()).isEqualTo("Hanoi");
     }
 
     @Test
@@ -113,6 +117,8 @@ class PostServiceValidationTest {
         request.setVisibility("PUBLIC");
         request.setMedia(List.of());
         request.setMediaUrls(List.of());
+        request.setMood("focused");
+        request.setLocation("Da Nang");
 
         PostEntity existing = new PostEntity();
         existing.setId(10L);
@@ -130,5 +136,7 @@ class PostServiceValidationTest {
         postService.updatePost("userA", 10L, request);
 
         assertThat(existing.getContent()).isEqualTo("updated text");
+        assertThat(existing.getMood()).isEqualTo("focused");
+        assertThat(existing.getLocation()).isEqualTo("Da Nang");
     }
 }

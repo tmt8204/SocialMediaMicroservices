@@ -31,6 +31,12 @@ public class PostEntity extends BaseEntity {
     @Column(name = "content")
     private String content;
 
+    @Column(name = "mood", length = 255)
+    private String mood;
+
+    @Column(name = "location", length = 500)
+    private String location;
+
     @Column(name = "reactions_count", columnDefinition = "int default 0")
     private int reactionsCount;
 
