@@ -1,0 +1,4 @@
+com\socialmedia\selenium\core\BaseUiTest.class
+com\socialmedia\selenium\tests\LoginTests.class
+com\socialmedia\selenium\config\TestConfig.class
+com\socialmedia\selenium\pages\LoginPage.class

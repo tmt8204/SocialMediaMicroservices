@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 public class CommentCreateRequest {
     
     @NotBlank(message = "Content is required")
-    @Size(max = 1000, message = "Content must not exceed 1000 characters")
+    @Size(max = 200, message = "Content must not exceed 200 characters")
     private String content;
 
 }

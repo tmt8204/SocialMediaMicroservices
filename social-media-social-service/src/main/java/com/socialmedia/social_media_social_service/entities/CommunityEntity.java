@@ -28,10 +28,10 @@ import lombok.NoArgsConstructor;
 )
 public class CommunityEntity extends BaseEntity {
 
-    @Column(name = "name", nullable = false, length = 150)
+    @Column(name = "name", nullable = false, columnDefinition = "nvarchar(150)")
     private String name;
 
-    @Column(name = "description", length = 2000)
+    @Column(name = "description", columnDefinition = "nvarchar(2000)")
     private String description;
 
     @Column(name = "cover_url")

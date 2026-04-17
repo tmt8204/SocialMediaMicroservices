@@ -12,10 +12,10 @@ import lombok.NoArgsConstructor;
 public class CreateCommunityRequest {
 
     @NotBlank(message = "Name is required")
-    @Size(max = 150, message = "Name must not exceed 150 characters")
+    @Size(min = 3, max = 30, message = "Name must be between 3 and 30 characters")
     private String name;
 
-    @Size(max = 2000, message = "Description must not exceed 2000 characters")
+    @Size(max = 200, message = "Description must not exceed 200 characters")
     private String description;
 
     private String coverUrl;

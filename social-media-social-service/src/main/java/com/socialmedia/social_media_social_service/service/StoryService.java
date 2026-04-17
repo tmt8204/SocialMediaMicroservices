@@ -204,7 +204,9 @@ public class StoryService {
         mediaServiceClient.deleteMediaByPublicIds(publicIds);
         storyViewRepository.deleteByStoryIdIn(storyIds);
         storyMediaRepository.deleteByStory_IdIn(storyIds);
-        storyRepository.deleteAllByIdInBatch(storyIds);
+        // Use entity deletion instead of bulk ID deletion so JPA cascade/orphan removal
+        // deletes child story_media rows before parent stories, avoiding FK violations.
+        storyRepository.deleteAll(candidates);
         return storyIds.size();
     }
 

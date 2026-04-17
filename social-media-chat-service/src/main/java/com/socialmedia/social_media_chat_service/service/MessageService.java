@@ -102,6 +102,9 @@ public class MessageService {
     }
 
     public MessagePageResponse getConversationMessages(String userId, String conversationId, Long cursor, int limit) {
+        if ("undefined".equals(conversationId) || "null".equals(conversationId)) {
+            return MessagePageResponse.builder().messages(Collections.emptyList()).nextCursor(0L).hasMore(false).totalCount(0).build();
+        }
         conversationService.requireMemberConversation(userId, conversationId);
         int safeLimit = Math.min(Math.max(limit, 1), 100);
 

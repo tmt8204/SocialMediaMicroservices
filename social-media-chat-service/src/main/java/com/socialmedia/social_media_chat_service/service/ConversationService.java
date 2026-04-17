@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Collections;
 
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -111,6 +112,9 @@ public class ConversationService {
     }
 
     public List<ConversationMemberInfoResponse> getConversationMembers(String currentUserId, String conversationId) {
+        if ("undefined".equals(conversationId) || "null".equals(conversationId)) {
+            return Collections.emptyList();
+        }
         ConversationDocument conversation = requireMemberConversation(currentUserId, conversationId);
         requireGroupConversation(conversation);
 
@@ -263,6 +267,9 @@ public class ConversationService {
     }
 
     public ConversationDocument requireMemberConversation(String userId, String conversationId) {
+        if ("undefined".equals(conversationId) || "null".equals(conversationId)) {
+            throw new NotFoundException("Conversation not found (undefined ID)");
+        }
         ConversationDocument conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new NotFoundException("Conversation not found"));
 

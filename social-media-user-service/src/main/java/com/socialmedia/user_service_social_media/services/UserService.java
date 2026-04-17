@@ -102,19 +102,8 @@ public class UserService {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new NoSuchElementException("User not found"));
 
-        //Validate username and email
-        if(userRepository.existsByUsernameIgnoreCase(request.getUsername()) && !user.getUsername().equalsIgnoreCase(request.getUsername())) {
-            throw new IllegalStateException("Username already exists");
-        }
-
-        if(userRepository.existsByEmailIgnoreCase(request.getEmail()) && !user.getEmail().equalsIgnoreCase(request.getEmail())) {
-            throw new IllegalStateException("Email already exists");
-        }
-
         Instant now = Instant.now();
 
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
         user.setAvatarUrl(request.getAvatarUrl());
         user.setBio(request.getBio());

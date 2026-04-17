@@ -68,6 +68,14 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             return unauthorized(exchange, "Missing required token claims");
         }
 
+        // Role enforcement for admin paths
+        if (path.startsWith("/api/admin")) {
+            List<String> adminRoles = authProperties.getAdminRoles();
+            if (adminRoles == null || !adminRoles.contains(role)) {
+                return forbidden(exchange, "Insufficient permissions to access admin resources");
+            }
+        }
+
         return tokenRevocationService.isTokenActive(token)
                 .flatMap(isActive -> {
                     if (!isActive) {
@@ -107,6 +115,16 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         String body = "{\"error\":\"unauthorized\",\"message\":\"" + message + "\"}";
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
+    }
+
+    private Mono<Void> forbidden(ServerWebExchange exchange, String message) {
+        ServerHttpResponse response = exchange.getResponse();
+        response.setStatusCode(HttpStatus.FORBIDDEN);
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+
+        String body = "{\"error\":\"forbidden\",\"message\":\"" + message + "\"}";
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
     }

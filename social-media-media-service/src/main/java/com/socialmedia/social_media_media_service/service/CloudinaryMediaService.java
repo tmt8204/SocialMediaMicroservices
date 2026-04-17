@@ -18,6 +18,10 @@ import org.springframework.web.multipart.MultipartFile;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.socialmedia.social_media_media_service.dto.UploadMediaResponse;
+import com.socialmedia.social_media_media_service.entities.MediaFileDocument;
+import com.socialmedia.social_media_media_service.entities.UserStorageDocument;
+import com.socialmedia.social_media_media_service.repository.MediaFileRepository;
+import com.socialmedia.social_media_media_service.repository.UserStorageRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +35,11 @@ public class CloudinaryMediaService {
     private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov");
 
     private final Cloudinary cloudinary;
+    private final UserStorageRepository userStorageRepository;
+    private final MediaFileRepository mediaFileRepository;
+
+    @Value("${app.media.max-user-quota-bytes:52428800}")
+    private long maxUserQuotaBytes;
 
     @Value("${app.media.max-total-files:5}")
     private int maxTotalFiles;
@@ -98,7 +107,17 @@ public class CloudinaryMediaService {
         MediaResourceType mediaResourceType = MediaResourceType.from(resourceType);
         String folder = mediaResourceType.folderForUser(normalizedUserId);
 
+        long incomingBytes = files.stream().mapToLong(MultipartFile::getSize).sum();
+        UserStorageDocument userStorage = userStorageRepository.findById(normalizedUserId)
+                .orElse(UserStorageDocument.builder().userId(normalizedUserId).totalBytesUsed(0).build());
+
+        if (userStorage.getTotalBytesUsed() + incomingBytes > maxUserQuotaBytes) {
+            throw new RuntimeException("QuotaExceededException: Bạn đã dùng hết hạn mức dung lượng tối đa (50MB). Vui lòng xoá bớt file cũ.");
+        }
+
         List<UploadMediaResponse.MediaItem> uploadedItems = new ArrayList<>();
+        long totalUploadedBytes = 0;
+
         for (MultipartFile file : files) {
             SupportedMediaType mediaType = detectMediaType(file);
             Map<String, Object> options = new HashMap<>();
@@ -112,20 +131,53 @@ public class CloudinaryMediaService {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
                 uploadedItems.add(mapUploadResult(uploadResult, mediaType));
+                
+                long bytes = Long.parseLong(uploadResult.getOrDefault("bytes", "0").toString());
+                totalUploadedBytes += bytes;
+
+                MediaFileDocument doc = MediaFileDocument.builder()
+                        .publicId(uploadResult.get("public_id").toString())
+                        .userId(normalizedUserId)
+                        .bytes(bytes)
+                        .resourceType(mediaType.getCloudinaryResourceType())
+                        .build();
+                mediaFileRepository.save(doc);
+
                 log.info("Uploaded media '{}' to Cloudinary with publicId='{}'", safeOriginalFilename(file), uploadResult.get("public_id"));
             } catch (IOException ex) {
                 throw new RuntimeException("Failed to upload media to Cloudinary.", ex);
             }
         }
 
+        userStorage.setTotalBytesUsed(userStorage.getTotalBytesUsed() + totalUploadedBytes);
+        userStorageRepository.save(userStorage);
+
         return UploadMediaResponse.builder()
                 .items(uploadedItems)
                 .build();
     }
 
+    public Map<String, Object> getUserStorage(String userId) {
+        String normalizedUserId = normalizeUserId(userId);
+        UserStorageDocument userStorage = userStorageRepository.findById(normalizedUserId)
+                .orElse(UserStorageDocument.builder().userId(normalizedUserId).totalBytesUsed(0).build());
+        return Map.of(
+            "usedBytes", userStorage.getTotalBytesUsed(),
+            "maxBytes", maxUserQuotaBytes
+        );
+    }
+
     public boolean deleteMedia(String publicId) {
         String normalizedPublicId = normalizePublicId(publicId);
         try {
+            mediaFileRepository.findByPublicId(normalizedPublicId).ifPresent(doc -> {
+                userStorageRepository.findById(doc.getUserId()).ifPresent(userStorage -> {
+                    userStorage.setTotalBytesUsed(Math.max(0, userStorage.getTotalBytesUsed() - doc.getBytes()));
+                    userStorageRepository.save(userStorage);
+                });
+                mediaFileRepository.delete(doc);
+            });
+
             Map<?, ?> imageResult = cloudinary.uploader().destroy(
                     normalizedPublicId,
                     ObjectUtils.asMap("invalidate", true, "resource_type", "image"));

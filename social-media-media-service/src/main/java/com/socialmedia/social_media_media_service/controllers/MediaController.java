@@ -55,6 +55,17 @@ public class MediaController {
         return ResponseEntity.ok(cloudinaryMediaService.getUploadedMedia(userId, resourceType));
     }
 
+    @GetMapping("/quota")
+    public ResponseEntity<Map<String, Object>> getUserQuota(
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestParam(value = "userId", required = false) String requestUserId) {
+        String userId = StringUtils.hasText(headerUserId) ? headerUserId : requestUserId;
+        if (!StringUtils.hasText(userId)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Missing UserId"));
+        }
+        return ResponseEntity.ok(cloudinaryMediaService.getUserStorage(userId));
+    }
+
     @DeleteMapping({"/{*publicId}", ""})
     public ResponseEntity<Map<String, Object>> deleteMedia(
             @PathVariable(name = "publicId", required = false) String pathPublicId,

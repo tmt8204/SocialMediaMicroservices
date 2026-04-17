@@ -28,13 +28,13 @@ public class PostEntity extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
-    @Column(name = "content")
+    @Column(name = "content", columnDefinition = "nvarchar(max)")
     private String content;
 
-    @Column(name = "mood", length = 255)
+    @Column(name = "mood", columnDefinition = "nvarchar(255)")
     private String mood;
 
-    @Column(name = "location", length = 500)
+    @Column(name = "location", columnDefinition = "nvarchar(500)")
     private String location;
 
     @Column(name = "reactions_count", columnDefinition = "int default 0")

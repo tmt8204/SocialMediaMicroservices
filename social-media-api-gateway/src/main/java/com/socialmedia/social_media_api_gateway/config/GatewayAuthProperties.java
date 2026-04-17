@@ -9,11 +9,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class GatewayAuthProperties {
 
     private List<String> publicPaths = new ArrayList<>(List.of("/api/auth/**"));
+    private List<String> adminRoles = new ArrayList<>(List.of("ADMIN", "MODERATOR"));
     private RevocationCheck revocationCheck = new RevocationCheck();
 
     public List<String> getPublicPaths() {
         return publicPaths;
     }
+
+    public List<String> getAdminRoles() {
+        return adminRoles;
+    }
+
+    public void setAdminRoles(List<String> adminRoles) {
+        this.adminRoles = adminRoles;
+    }
+
 
     public void setPublicPaths(List<String> publicPaths) {
         this.publicPaths = publicPaths;
